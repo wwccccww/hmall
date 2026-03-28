@@ -4,3 +4,7 @@ logs/
 log/
 *.jar
 *.lst
+*.png
+*.jpg
+*.svg
+

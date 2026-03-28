@@ -25,7 +25,7 @@ public class ItemClientFallback implements FallbackFactory<ItemClient> {
 
             @Override
             public void deductStock(List<OrderDetailDTO> items) {
-                throw new RuntimeException("");
+                throw new RuntimeException("繁忙中，请稍后再试哦~");
             }
         };
     }

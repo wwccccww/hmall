@@ -8,6 +8,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.annotations.Param;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
+@Slf4j
 public class OrderController {
     private final IOrderService orderService;
 
@@ -26,8 +28,12 @@ public class OrderController {
 
     @ApiOperation("创建订单")
     @PostMapping
-    public Long createOrder(@RequestBody OrderFormDTO orderFormDTO){
-        return orderService.createOrder(orderFormDTO);
+    public String createOrder(@RequestBody OrderFormDTO orderFormDTO){
+        // 1.创建订单
+        String orderId = orderService.createOrder(orderFormDTO).toString();
+        log.info("OrderController 的 createOrder:{}", orderId);
+        // 2.返回订单id
+        return "\" " + orderId + "\"";
     }
 
     @ApiOperation("标记订单已支付")

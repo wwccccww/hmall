@@ -1,5 +1,7 @@
 package com.hmall.pay.domain.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -15,10 +17,13 @@ import java.time.LocalDateTime;
 @ApiModel(description = "支付单vo实体")
 public class PayOrderVO {
     @ApiModelProperty("id")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     @ApiModelProperty("业务订单号")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long bizOrderNo;
     @ApiModelProperty("支付单号")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long payOrderNo;
     @ApiModelProperty("支付用户id")
     private Long bizUserId;

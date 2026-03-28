@@ -51,9 +51,9 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         // 1.查询支付单
         PayOrder po = getById(payOrderDTO.getId());
         // 2.判断状态
-        if(!PayStatus.WAIT_BUYER_PAY.equalsValue(po.getStatus())){
-            // 订单不是未支付，状态异常
-            throw new BizIllegalException("交易已支付或关闭！");
+        if (po == null || !PayStatus.WAIT_BUYER_PAY.equalsValue(po.getStatus())) {
+            // 订单不存在或不是未支付，状态异常
+            throw new BizIllegalException("交易支付确认失败，订单可能不存在或已超时关闭！");
         }
         // 3.尝试扣减余额
         userClient.deductMoney(payOrderDTO.getPw(), po.getAmount());
@@ -62,9 +62,9 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         if (!success) {
             throw new BizIllegalException("交易已支付或关闭！");
         }
-        // 5.修改订单状态 TODO基于MQ修改
+        // 5.修改订单状态 基于MQ修改
         try {
-            rabbitTemplate.convertAndSend("pay.direct", "pay.success", po.getPayOrderNo());
+            rabbitTemplate.convertAndSend("pay.direct", "pay.success", po.getBizOrderNo());
         } catch (AmqpException e) {
             throw new RuntimeException(e);
         }
@@ -118,18 +118,26 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         return oldOrder;
     }
 
+    public PayOrder queryByBizOrderNo(Long bizOrderNo) {
+        if (bizOrderNo == null) return null;
+        return lambdaQuery()
+                .eq(PayOrder::getBizOrderNo, bizOrderNo)
+                .last("limit 1") // 确保即使有重复脏数据也不会报 500
+                .one();
+    }
+
     private PayOrder buildPayOrder(PayApplyDTO payApplyDTO) {
         // 1.数据转换
         PayOrder payOrder = BeanUtils.toBean(payApplyDTO, PayOrder.class);
         // 2.初始化数据
         payOrder.setPayOverTime(LocalDateTime.now().plusMinutes(120L));
         payOrder.setStatus(PayStatus.WAIT_BUYER_PAY.getValue());
-        payOrder.setBizUserId(UserContext.getUser());
+        
+        Long userId = UserContext.getUser();
+        if (userId == null) {
+             throw new BizIllegalException("获取用户信息异常，请检查登录状态！");
+        }
+        payOrder.setBizUserId(userId);
         return payOrder;
-    }
-    public PayOrder queryByBizOrderNo(Long bizOrderNo) {
-        return lambdaQuery()
-                .eq(PayOrder::getBizOrderNo, bizOrderNo)
-                .one();
     }
 }

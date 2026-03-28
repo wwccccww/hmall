@@ -26,12 +26,12 @@ public class PayController {
 
     @ApiOperation("生成支付单")
     @PostMapping
-    public String applyPayOrder(@RequestBody PayApplyDTO applyDTO){
+    public Long applyPayOrder(@RequestBody PayApplyDTO applyDTO){
         if(!PayType.BALANCE.equalsValue(applyDTO.getPayType())){
             // 目前只支持余额支付
             throw new BizIllegalException("抱歉，目前只支持余额支付");
         }
-        return payOrderService.applyPayOrder(applyDTO);
+        return Long.valueOf(payOrderService.applyPayOrder(applyDTO));
     }
 
     @ApiOperation("尝试基于用户余额支付")

@@ -18,5 +18,5 @@ public interface ICartService extends IService<Cart> {
 
     List<CartVO> queryMyCarts();
 
-    void removeByItemIds(Collection<Long> itemIds);
+    void removeByItemIds(Collection<Long> itemIds, Long userId);
 }

@@ -77,7 +77,7 @@ const handleLogin = async () => {
               <input 
                 v-model="loginForm.username"
                 type="text" 
-                placeholder="用户名或电子邮箱"
+                placeholder="   用户名或电子邮箱"
                 class="spa-input pl-11"
                 @focus="isFocused = 'username'"
                 @blur="isFocused = null"
@@ -102,7 +102,7 @@ const handleLogin = async () => {
               <input 
                 v-model="loginForm.password"
                 :type="showPassword ? 'text' : 'password'" 
-                placeholder="••••••••"
+                placeholder="   请输入密码"
                 class="spa-input pl-11 pr-11"
                 @focus="isFocused = 'password'"
                 @blur="isFocused = null"

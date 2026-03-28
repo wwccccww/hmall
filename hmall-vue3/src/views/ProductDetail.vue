@@ -21,17 +21,18 @@ const product = ref({
 const selectedSpec = ref('')
 const selectedColor = ref('')
 
+const quantityInCart = ref(0) // 记录该商品在购物车中的现有数量
+
 onMounted(async () => {
   try {
     const res = await request.get(`/items/${route.params.id}`)
     if (res) {
-      // 解析规格信息，如果后端 spec 是 JSON 字符串
+      // 解析规格信息
       let parsedSpecs = []
       let parsedColors = []
       
       try {
         const specObj = JSON.parse(res.spec || '{}')
-        // 假设 spec 包含不同维度，我们尝试提取
         parsedSpecs = specObj['容量'] ? [specObj['容量']] : (specObj['内存'] ? [specObj['内存']] : ['标准配置'])
         parsedColors = specObj['颜色'] ? [specObj['颜色']] : ['默认外观']
       } catch (e) {
@@ -47,28 +48,50 @@ onMounted(async () => {
         desc: `${res.name}。这不仅是一款产品，更是数字工艺与未来主义设计的结晶。采用行业领先的材料打造，专为追求卓越体验的专业人士而生。`,
         specs: parsedSpecs,
         colors: parsedColors,
-        img: res.image
+        img: res.image,
+        stock: res.stock
       }
       selectedSpec.value = product.value.specs[0]
       selectedColor.value = product.value.colors[0]
     }
+
+    // 获取当前购物车状态，检查该商品是否已存在于购物车
+    try {
+      const carts = await request.get('/carts')
+      const existing = carts.find(c => c.itemId === product.value.id)
+      if (existing) quantityInCart.value = existing.num
+    } catch(e) {
+      console.warn("未能获取购物车实时状态，跳过预检")
+    }
+
   } catch (e) {
     console.error('获取商品详情失败:', e)
   }
 })
 
 const addToCart = async () => {
+  // 综合检查：当前已选 + 1 是否超过库存
+  const nextQuantity = quantityInCart.value + 1
+  if (product.value.stock !== undefined && nextQuantity > product.value.stock) {
+     alert(`抱歉，该商品库存有限（当前库存：${product.value.stock}）。您的购物车中已有 ${quantityInCart.value} 件，无法再添加更多。`)
+     return
+  }
+
   try {
     await request.post('/carts', {
       itemId: product.value.id,
       num: 1,
       name: product.value.name,
-      price: product.value.price * 100, // 价格转为分
+      price: product.value.price * 100,
       image: product.value.img,
       category: '手机',
       brand: product.value.brand,
       spec: JSON.stringify({ "容量": selectedSpec.value, "颜色": selectedColor.value })
     })
+    
+    // 更新本地缓存的数量，防止连续点击绕过检查
+    quantityInCart.value += 1
+    
     router.push('/cart')
   } catch(e) {
     console.error("加入购物袋失败，即将跳转登录页...", e)
@@ -76,8 +99,30 @@ const addToCart = async () => {
   }
 }
 
-const goPay = () => {
-  router.push('/pay')
+const goPay = async () => {
+  try {
+    const details = [{ itemId: product.value.id, num: 1 }]
+    
+    // 向后端 trade-service 申请创建订单
+    const orderId = await request.post('/orders', {
+      details,
+      paymentType: 3, // 对应后端的余额支付
+      addressId: 1    // 替换为数据库中真实存在的地址 ID
+    })
+    
+    // 携带生成的订单 ID 跳转至支付页
+    router.push({ 
+      path: '/pay', 
+      query: { id: orderId } 
+    })
+  } catch(e) {
+    console.error("立即结算失败", e)
+    if (e.response?.status === 401) {
+      router.push('/login')
+    } else {
+      alert("订单生成异常，请稍后刷新重试")
+    }
+  }
 }
 </script>
 
@@ -120,7 +165,7 @@ const goPay = () => {
              
              <!-- Specs -->
              <div class="space-y-4">
-                <span class="text-[11px] font-bold uppercase tracking-widest text-gray-900 block">存储容量</span>
+                <span class="text-[11px] font-bold uppercase tracking-widest text-gray-900 block">默认配置</span>
                 <div class="flex flex-wrap gap-4">
                    <button 
                      v-for="spec in product.specs" :key="spec"

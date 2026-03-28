@@ -1,5 +1,7 @@
 package com.hmall.trade.domain.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
 @ApiModel(description = "订单页面VO")
 public class OrderVO {
     @ApiModelProperty("订单id")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     @ApiModelProperty("总金额，单位为分")
     private Integer totalFee;

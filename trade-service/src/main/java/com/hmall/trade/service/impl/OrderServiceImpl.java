@@ -15,6 +15,7 @@ import com.hmall.trade.service.IOrderDetailService;
 import com.hmall.trade.service.IOrderService;
 import io.seata.spring.annotation.GlobalTransactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
 
     private final ItemClient itemClient;
@@ -71,21 +73,50 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         List<OrderDetail> details = buildDetails(order.getId(), items, itemNumMap);
         detailService.saveBatch(details);
 
+        log.info("创建订单，订单id：{}", order.getId());
+        for (OrderDetail detail : details) {
+            log.info("订单详情：{}", detail);
+        }
         // 3.扣减库存
         try {
             itemClient.deductStock(detailDTOS);
+            for (OrderDetailDTO detail : detailDTOS) {
+                log.info("扣减库存，商品id：{}, 数量：{}", detail.getItemId(), detail.getNum());
+            }
         } catch (Exception e) {
             throw new RuntimeException("库存不足！");
         }
 
-        // 4.清理购物车商品
-        cartClient.deleteCartItemByIds(itemIds);
+        // 4.清理购物车商品 (挪动到支付成功后再处理，防止未付钱就清空购物车)
+        // cartClient.deleteCartItemByIds(itemIds);
         return order.getId();
     }
 
     @Override
+    @Transactional
     public void markOrderPaySuccess(Long orderId) {
+        // 1.查询订单
+        Order order = getById(orderId);
+        if (order == null || order.getStatus() != 1) {
+            return;
+        }
 
+        // 2.修改订单状态
+        order.setStatus(2); // 已支付
+        updateById(order);
+
+        // 3.清理购物车
+        // 3.1.根据订单id查询订单详情，获取商品id集合
+        List<OrderDetail> details = detailService.lambdaQuery().eq(OrderDetail::getOrderId, orderId).list();
+        if (details == null || details.isEmpty()) {
+            return;
+        }
+        Set<Long> itemIds = details.stream().map(OrderDetail::getItemId).collect(Collectors.toSet());
+        // 3.2.删除购物车，注意：此处是后台线程，必须显式传递 userId
+        cartClient.deleteCartItemByIds(itemIds, order.getUserId());
+        for(Long itemId : itemIds){
+            log.info("清理购物车，商品id：{}", itemId);
+        }
     }
 
     /**

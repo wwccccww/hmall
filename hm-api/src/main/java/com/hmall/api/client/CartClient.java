@@ -9,5 +9,5 @@ import java.util.Collection;
 @FeignClient("cart-service")
 public interface CartClient {
     @DeleteMapping("/carts")
-    void deleteCartItemByIds(@RequestParam("ids") Collection<Long> ids);
+    void deleteCartItemByIds(@RequestParam("ids") Collection<Long> ids, @RequestParam("userId") Long userId);
 }

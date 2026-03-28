@@ -9,6 +9,7 @@ import com.hmall.item.domain.dto.OrderDetailDTO;
 import com.hmall.item.domain.po.Item;
 import com.hmall.item.mapper.ItemMapper;
 import com.hmall.item.service.IItemService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
@@ -20,10 +21,12 @@ import java.util.List;
  * </p>
  */
 @Service
+@Slf4j
 public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements IItemService {
 
     @Override
     public void deductStock(List<OrderDetailDTO> items) {
+        log.info("更新库存，商品列表：{}", items);
         String sqlStatement = "com.hmall.item.mapper.ItemMapper.updateStock";
         boolean r = false;
         try {
