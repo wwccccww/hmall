@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 瑞士温泉极简主义调色板 */
+  --spa-white: #fdfdfd;
+  --spa-off: #f8f9fa;
+  --spa-stone: #f1f3f5;
+  --spa-charcoal: #111827;
+  --spa-slate: #4b5563;
+  --spa-muted: #9ca3af;
+  --spa-border: rgba(0, 0, 0, 0.05);
+  --spa-accent: #0f172a; /* 深曜石色用于提供对比 */
+  
+  /* 精确间距系统 */
+  --space-xs: 0.5rem;   /* 8px */
+  --space-sm: 1rem;     /* 16px */
+  --space-md: 1.5rem;   /* 24px */
+  --space-lg: 2rem;     /* 32px */
+  --space-xl: 3rem;     /* 48px */
+  --space-2xl: 4rem;    /* 64px */
+  
+  /* 优雅圆角几何 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  /* 排版字体 */
+  --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--spa-white);
+  color: var(--spa-charcoal);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* 高级瑞士温泉组件库 */
+.spa-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.03);
+}
+
+.spa-card {
+  background: white;
+  border: 1px solid var(--spa-border);
+  border-radius: var(--radius-lg);
+  transition: all 0.4s cubic-bezier(0.1, 0.8, 0.2, 1);
+}
+
+.spa-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.spa-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  background: var(--spa-accent);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spa-button:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.spa-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--spa-stone);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--spa-charcoal);
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.spa-input:focus {
+  outline: none;
+  background: white;
+  border-color: var(--spa-charcoal);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.02);
+}
+
+/* 完美间距实用类 */
+.spacing-perfect {
+  padding: var(--space-xl);
+}
+
+.gap-perfect {
+  gap: var(--space-md);
+}
+
+/* 字体排印缩放 */
+.h1-refined {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--spa-charcoal);
+}
+
+.body-refined {
+  font-size: 0.9375rem;
+  color: var(--spa-slate);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.label-refined {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--spa-muted);
+}
+
+/* 动画特效 */
+@keyframes spa-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-spa-reveal {
+  animation: spa-fade-in 1.2s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+/* 响应式处理 */
+@media (max-width: 768px) {
+  :root {
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+  }
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--spa-stone);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--spa-muted);
+}
+

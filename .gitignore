@@ -1,0 +1,6 @@
+# 日志文件
+*.log
+logs/
+log/
+*.jar
+*.lst
