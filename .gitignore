@@ -7,4 +7,5 @@ log/
 *.png
 *.jpg
 *.svg
+**/hmall-nginx/
 

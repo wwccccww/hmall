@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useSearchStore } from '../store/search'
+import { storeToRefs } from 'pinia'
 import request from '../utils/request'
 import { 
   ShoppingBag, 
@@ -17,10 +19,14 @@ import {
   Menu,
   X
 } from 'lucide-vue-next'
+import SearchOverlay from '../components/SearchOverlay.vue'
 
 const categories = ['All', 'iPhone', 'Audio', 'iPad', 'Mac', 'Watch']
 const activeCategory = ref('All')
 const isMenuOpen = ref(false)
+
+const searchStore = useSearchStore()
+const { showSearch } = storeToRefs(searchStore)
 
 const featured = ref([])
 const fallbackFeatured = [
@@ -112,7 +118,10 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
             <ShoppingBag :size="18" stroke-width="1.5" />
             <span class="absolute top-2 right-2 w-2 h-2 bg-black rounded-full"></span>
           </button>
-          <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
+          <button 
+            @click="searchStore.toggleSearch(true)"
+            class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors"
+          >
             <Search :size="18" stroke-width="1.5" />
           </button>
           <template v-if="userInfo">
@@ -141,51 +150,12 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
     </nav>
 
     <main>
-      <!-- Hero: Editorial Minimalist -->
-      <section class="relative min-h-screen flex items-center pt-20 overflow-hidden bg-[#F9FAFB]">
-        <div class="max-w-7xl mx-auto px-6 md:px-12 w-full grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-          <div class="space-y-10 animate-spa-reveal relative z-10">
-            <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-white border border-gray-100 rounded-full shadow-sm">
-              <span class="w-1.5 h-1.5 bg-black rounded-full animate-pulse"></span>
-              <span class="text-[10px] font-bold tracking-widest uppercase text-gray-400">卓越工艺与精密机械</span>
-            </div>
-            <h1 class="h1-refined" v-if="userInfo">欢迎回来，<br>{{ userInfo.username }}。</h1>
-            <h1 class="h1-refined" v-else>致力于<br>追求极致。</h1>
-            <p class="body-refined max-w-lg text-lg" v-if="userInfo">
-              您的专属精选与最新技术探索已准备就绪。在这里，卓越工艺与极简美学始终为您而生。
-            </p>
-            <p class="body-refined max-w-lg text-lg" v-else>
-              探索瑞士极简美学与尖端数字工艺的完美交融。专为欣赏完美内敛设计与无声力量的您量身定制。
-            </p>
-            <div class="flex flex-wrap items-center gap-6 pt-4">
-              <button class="spa-button h-14 px-10 shadow-lg shadow-black/5 flex items-center gap-3">
-                探索全新系列 <ArrowRight :size="18" />
-              </button>
-              <button class="h-14 px-8 flex items-center gap-3 text-sm font-semibold hover:translate-x-1 transition-transform">
-                <div class="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center">
-                  <Play :size="14" fill="black" />
-                </div>
-                观看品牌影片
-              </button>
-            </div>
-          </div>
-          
-          <div class="relative flex justify-center lg:justify-end animate-spa-reveal [animation-delay:0.3s]">
-            <!-- Hero Product -->
-            <img src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=1200&auto=format&fit=crop" class="w-full max-w-[600px] object-contain drop-shadow-2xl translate-y-10 rounded-2xl" alt="iPhone 15 Pro">
-          </div>
-        </div>
-        
-        <!-- Background Accents -->
-        <div class="absolute top-[20%] right-[-10%] w-[50%] h-[50%] bg-blue-50/30 rounded-full blur-[150px] pointer-events-none"></div>
-      </section>
 
       <!-- Category Filter & Grid -->
       <section class="max-w-7xl mx-auto px-6 md:px-12 py-32">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-20 animate-spa-reveal">
           <div class="space-y-4">
-            <span class="label-refined">精选创新技术</span>
-            <h2 class="text-4xl md:text-5xl font-light tracking-tight">核心产品线。</h2>
+            <h2 class="text-4xl md:text-5xl font-light tracking-tight">商品分类</h2>
           </div>
           <div class="flex flex-wrap gap-2 overflow-x-auto pb-4 md:pb-0 scrollbar-hide">
             <button 
@@ -283,6 +253,8 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
         </div>
       </div>
     </footer>
+
+    <SearchOverlay />
   </div>
 </template>
 
