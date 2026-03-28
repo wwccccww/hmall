@@ -1,9 +1,11 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search, X, ArrowRight, Loader2, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { useSearchStore } from '../store/search'
 import { storeToRefs } from 'pinia'
 
+const route = useRoute()
 const searchStore = useSearchStore()
 const { searchQuery, results, pageNo, totalPages, totalItems, isLoading, showSearch } = storeToRefs(searchStore)
 
@@ -38,6 +40,14 @@ const visiblePages = computed(() => {
   if (end - start + 1 < maxPages) start = Math.max(1, end - maxPages + 1)
   for (let i = start; i <= end; i++) pages.push(i)
   return pages
+})
+
+const isVisibleInCurrentRoute = computed(() => {
+  // 定义业务专注页面：详情页、购物车、支付页、登录页
+  const businessRoutes = ['ProductDetail', 'Cart', 'Pay', 'Login']
+  // 只有当不在这些页面，且全局 showSearch 为开启时，才实际渲染搜索层
+  // 这样即使用户在详情页下单支付后点击回退，搜索结果依然会被“唤醒”
+  return showSearch.value && !businessRoutes.includes(route.name)
 })
 
 const clearInput = () => {
@@ -78,7 +88,7 @@ onUnmounted(() => {
 
 <template>
   <Transition name="fade">
-    <div v-if="showSearch" class="fixed inset-0 z-[200] flex flex-col bg-white">
+    <div v-if="isVisibleInCurrentRoute" class="fixed inset-0 z-[200] flex flex-col bg-white">
       <!-- Header -->
       <div class="flex items-center justify-between px-6 md:px-12 py-8 border-b border-gray-50">
         <div class="flex items-center gap-3">
@@ -135,7 +145,6 @@ onUnmounted(() => {
                 v-for="item in results" 
                 :key="item.id"
                 :to="'/product/' + item.id"
-                @click="searchStore.toggleSearch(false)"
                 class="flex items-center gap-6 p-6 rounded-3xl border border-transparent hover:border-gray-100 hover:bg-gray-50/50 transition-all group animate-spa-reveal"
               >
                 <div class="w-24 h-24 bg-[#F9FAFB] rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0">

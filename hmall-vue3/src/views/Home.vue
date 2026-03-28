@@ -19,7 +19,6 @@ import {
   Menu,
   X
 } from 'lucide-vue-next'
-import SearchOverlay from '../components/SearchOverlay.vue'
 
 const categories = ['All', 'iPhone', 'Audio', 'iPad', 'Mac', 'Watch']
 const activeCategory = ref('All')
@@ -253,8 +252,6 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
         </div>
       </div>
     </footer>
-
-    <SearchOverlay />
   </div>
 </template>
 
