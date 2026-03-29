@@ -18,8 +18,10 @@ export {
 
 request.interceptors.request.use(
   config => {
-    const token = sessionStorage.getItem('token')
-    if (token && token !== 'undefined' && token !== 'null') {
+    const raw = sessionStorage.getItem('token')
+    const token =
+      raw && raw !== 'undefined' && raw !== 'null' ? String(raw).trim() : ''
+    if (token) {
       config.headers['authorization'] = token
     } else {
       delete config.headers['authorization']
@@ -35,8 +37,6 @@ request.interceptors.response.use(
     const url = err.config?.url || ''
     const isLoginRequest = url.includes('/users/login')
     const silent = err.config?.silentError === true
-
-    console.log('response 拦截器 错误', err.response?.data)
 
     showApiErrorAlert(err, { silent })
 

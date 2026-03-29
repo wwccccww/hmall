@@ -19,12 +19,32 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.io.IOException;
 import java.util.List;
 
-// @SpringBootTest(properties = "spring.profiles.active=local")
+@SpringBootTest(properties = "spring.profiles.active=local")
 class ItemServiceImplTest {
+
+
+    //测试redis连接
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
+
+    @Test
+    void testRedisConnect() {
+        stringRedisTemplate.opsForValue().set("cursor:test:key", "Connection_Success");
+    
+        // 2. 尝试读取
+        String result = stringRedisTemplate.opsForValue().get("cursor:test:key");
+        
+        // 3. 强力打印（加上明显的前缀方便搜索）
+        System.out.println("================================");
+        System.out.println("Redis result >>> " + result);
+        System.out.println("================================");
+    }
     // private RestHighLevelClient client;
 
     // @Autowired

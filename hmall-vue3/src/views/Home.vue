@@ -120,6 +120,9 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
         <!-- Desktop Menu -->
         <div class="hidden md:flex items-center gap-10">
           <a v-for="link in ['单品专区', '技术探索', '关于我们']" :key="link" href="#" class="text-[11px] font-semibold uppercase tracking-widest text-gray-500 hover:text-black transition-colors">{{ link }}</a>
+          <router-link to="/coupons" class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-orange-500 hover:text-orange-600 transition-colors">
+            <Zap :size="12" stroke-width="2.5" /> 限时领券
+          </router-link>
         </div>
 
         <div class="flex items-center gap-4">

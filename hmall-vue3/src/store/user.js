@@ -6,7 +6,8 @@ export const useUserStore = defineStore('user', {
     token: sessionStorage.getItem('token') || ''
   }),
   getters: {
-    isLoggedIn: (state) => !!state.token
+    isLoggedIn: (state) => !!state.token,
+    isAdmin: (state) => state.userInfo?.role === 1
   },
   actions: {
     setUserInfo(user, token) {

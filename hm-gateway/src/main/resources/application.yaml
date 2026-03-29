@@ -14,6 +14,7 @@ hm:
       - /users/login
       - /items/**
       - /hi
+      - /coupons   # GET 优惠券列表（领券中心公开浏览，无需登录）
 
 spring:
   output:

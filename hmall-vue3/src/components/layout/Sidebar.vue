@@ -9,7 +9,8 @@ import {
   FolderTree, 
   Package,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Ticket
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 
@@ -18,8 +19,7 @@ const menuItems = [
   { name: '数据大盘', icon: LayoutDashboard, path: '/admin/dashboard' },
   { name: '商品图录', icon: Package, path: '/admin/goods/list' },
   { name: '类目资源', icon: FolderTree, path: '/admin/goods/category' },
-  { name: '权限安全', icon: ShieldCheck, path: '/admin/auth/role' },
-  { name: '系统设置', icon: Settings, path: '/admin/auth/menu' },
+  { name: '优惠券运营', icon: Ticket, path: '/admin/promotion/coupons' },
 ]
 
 const toggleSidebar = () => {

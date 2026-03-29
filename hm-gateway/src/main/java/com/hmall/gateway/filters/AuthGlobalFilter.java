@@ -1,14 +1,15 @@
 package com.hmall.gateway.filters;
 
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.text.AntPathMatcher;
 import com.hmall.gateway.config.AuthProperties;
 import com.hmall.gateway.utils.JwtTool;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -16,8 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-
+@Slf4j
 @Component
 @RequiredArgsConstructor
 @EnableConfigurationProperties({AuthProperties.class})
@@ -37,25 +37,21 @@ public class AuthGlobalFilter implements GlobalFilter , Ordered {
         if(isExclude(request.getPath().toString())){
             return chain.filter(exchange);
         }
-        //获取token
-        String authorization = "authorization";
-        List<String> headers = request.getHeaders().get(authorization);
-        String token = null;
-        if(!CollUtil.isEmpty(headers)){
-            token = headers.get(0);
-        }
+        // 使用标准 Authorization 头解析（WebFlux 下对大小写/键名更稳妥）
+        String token = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         //解析token
         Long userId = null;
         try {
             userId = jwtTool.parseToken(token);
         } catch (Exception e) {
+            log.warn("JWT 校验失败 path={} msg={}", request.getPath(), e.getMessage());
             ServerHttpResponse response = exchange.getResponse();
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
 //            response.setStatusCode(HttpStatus.valueOf(401));
             return response.setComplete();
         }
 
-        System.out.println("userId:"+userId);
+        log.debug("userId: {}", userId);
 
         String userInfo = userId.toString();
         //这个传不到下游微服务

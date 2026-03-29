@@ -5,6 +5,7 @@ import cn.hutool.jwt.JWT;
 import cn.hutool.jwt.JWTValidator;
 import cn.hutool.jwt.signers.JWTSigner;
 import cn.hutool.jwt.signers.JWTSignerUtil;
+import cn.hutool.core.util.StrUtil;
 import com.hmall.common.exception.UnauthorizedException;
 import org.springframework.stereotype.Component;
 
@@ -42,8 +43,14 @@ public class JwtTool {
      * @return 解析刷新token得到的用户信息
      */
     public Long parseToken(String token) {
+        if (token != null) {
+            token = StrUtil.trim(token);
+            if (StrUtil.startWithIgnoreCase(token, "Bearer ")) {
+                token = StrUtil.trim(StrUtil.subSuf(token, 7));
+            }
+        }
         // 1.校验token是否为空
-        if (token == null) {
+        if (token == null || token.isEmpty()) {
             throw new UnauthorizedException("未登录");
         }
         // 2.校验并解析jwt
