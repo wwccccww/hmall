@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { Check, ArrowRight, ShieldCheck, QrCode } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '../store/user'
 import { getOrderById, createPayOrder, payOrder, getCurrentUser } from '@/api'
 
 const router = useRouter()
+const userStore = useUserStore()
 const route = useRoute()
 const isPaid = ref(false)
 const isPaying = ref(false)
@@ -61,9 +63,10 @@ const handlePay = async () => {
       try {
         const user = await getCurrentUser()
         if (user) {
-          sessionStorage.setItem("user-info", JSON.stringify(user))
-          // 同时也发送一个全局事件或简单刷新缓存，让 Navbar 感知到
-          window.dispatchEvent(new Event('storage')) 
+          const token = userStore.token || sessionStorage.getItem('token') || ''
+          if (token) {
+            userStore.setUserInfo(user, token)
+          }
         }
       } catch (userErr) {
         console.warn("余额自动同步失败，请手动刷新", userErr)

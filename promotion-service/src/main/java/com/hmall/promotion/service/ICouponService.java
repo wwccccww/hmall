@@ -37,6 +37,9 @@ public interface ICouponService extends IService<Coupon> {
     /** 查询当前用户的全部领券记录 */
     List<CouponVO> queryMyCoupons();
 
-    /** 查询所有进行中的优惠券列表 */
+    /** 查询所有进行中的优惠券列表（C 端领券中心，展示全平台已发布券） */
     List<CouponVO> queryAvailableCoupons();
+
+    /** 管理端：当前登录管理员创建的优惠券（含草稿/进行中/结束等全部状态） */
+    List<CouponVO> queryManageCoupons();
 }

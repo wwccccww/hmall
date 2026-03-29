@@ -1,13 +1,17 @@
 <script setup>
 import { Bell, Search, User, LogOut, ChevronDown, Zap, ShieldCheck } from 'lucide-vue-next'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../../store/user'
+import { useUserStore, GUEST_USER_DISPLAY } from '../../store/user'
 
 const router = useRouter()
 const userStore = useUserStore()
+const { userInfo: storeUser } = storeToRefs(userStore)
 const showProfileMenu = ref(false)
-const userInfo = ref({ username: '未登录', balance: 0 })
+
+/** 与 Pinia 同步：未登录时展示默认昵称 */
+const userInfo = computed(() => storeUser.value ?? GUEST_USER_DISPLAY)
 
 const isAdmin = computed(() => userStore.isAdmin)
 
@@ -15,17 +19,6 @@ const handleLogout = () => {
   userStore.clearUserInfo()
   router.push('/admin-login')
 }
-
-onMounted(() => {
-  const info = sessionStorage.getItem('user-info')
-  if (info) {
-    try {
-      userInfo.value = JSON.parse(info)
-    } catch (e) {
-      console.error('Failed to parse user info', e)
-    }
-  }
-})
 </script>
 
 <template>
@@ -57,7 +50,7 @@ onMounted(() => {
            class="flex items-center gap-3 h-full px-4 rounded-full border border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer group active:scale-95"
          >
            <div class="w-6 h-6 rounded-full bg-black flex items-center justify-center transition-all">
-              <span class="text-[10px] font-bold text-white">{{ userInfo.username?.charAt(0).toUpperCase() }}</span>
+              <span class="text-[10px] font-bold text-white">{{ userInfo.username.charAt(0).toUpperCase() }}</span>
            </div>
            <div class="hidden sm:flex flex-col text-left gap-0.5">
               <span class="text-[11px] font-bold text-gray-900 leading-none tracking-tight">{{ userInfo.username }}</span>

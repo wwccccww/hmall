@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../store/user'
 import {
   ChevronLeft, Ticket, Gift, Clock, CheckCircle2,
   ShoppingBag, Zap, BadgePercent, BookmarkCheck
@@ -9,6 +10,7 @@ import { getAvailableCoupons, getMyCoupons, receiveCoupon } from '@/api/coupon'
 import { showApiErrorAlert } from '@/utils/apiError'
 
 const router = useRouter()
+const userStore = useUserStore()
 const activeTab = ref('available') // 'available' | 'mine'
 const loading = ref(false)
 const receivingId = ref(null)  // 正在领取的券 id（防重复点击）
@@ -17,9 +19,9 @@ const availableCoupons = ref([])
 const myCoupons = ref([])
 
 // ============================================================
-// 工具
+// 工具（与 Pinia 同步，401 清空 token 后立即视为未登录）
 // ============================================================
-const isLoggedIn = () => !!sessionStorage.getItem('token')
+const isLoggedIn = () => userStore.isLoggedIn
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
@@ -64,7 +66,8 @@ const loadMine = async () => {
   }
   loading.value = true
   try {
-    const res = await getMyCoupons()
+    // silentError：避免与 axios 全局拦截器重复弹窗
+    const res = await getMyCoupons({ silentError: true })
     myCoupons.value = Array.isArray(res) ? res : []
   } catch (e) {
     showApiErrorAlert(e)
@@ -89,7 +92,7 @@ const handleReceive = async (coupon) => {
   if (receivingId.value === coupon.id) return
   receivingId.value = coupon.id
   try {
-    await receiveCoupon(coupon.id)
+    await receiveCoupon(coupon.id, { silentError: true })
     alert(`「${coupon.name}」领取成功！`)
     loadAvailable()
     if (activeTab.value === 'mine') loadMine()

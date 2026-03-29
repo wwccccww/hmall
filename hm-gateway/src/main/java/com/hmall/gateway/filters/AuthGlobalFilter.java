@@ -33,8 +33,12 @@ public class AuthGlobalFilter implements GlobalFilter , Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
+        // 领券中心「仅浏览列表」：GET /coupons 免登录；POST /coupons（创建）、/coupons/** 子路径必须走 JWT 并下发 user-info
+        if (isPublicCouponListGet(request)) {
+            return chain.filter(exchange);
+        }
         //判断是否需要拦截
-        if(isExclude(request.getPath().toString())){
+        if (isExclude(request.getPath().toString())) {
             return chain.filter(exchange);
         }
         // 使用标准 Authorization 头解析（WebFlux 下对大小写/键名更稳妥）
@@ -64,12 +68,21 @@ public class AuthGlobalFilter implements GlobalFilter , Ordered {
     }
 
     private boolean isExclude(String authPath) {
-        for (String pathPattern : authProperties.getExcludePaths() ) {
+        for (String pathPattern : authProperties.getExcludePaths()) {
             if (antPathMatcher.match(pathPattern, authPath)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** 仅 GET 且路径为 /coupons（无子路径）时公开，与「排除整个 /coupons」不同，避免 POST 创建券无 user-info */
+    private boolean isPublicCouponListGet(ServerHttpRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod().name())) {
+            return false;
+        }
+        String path = request.getPath().value();
+        return "/coupons".equals(path);
     }
 
     @Override

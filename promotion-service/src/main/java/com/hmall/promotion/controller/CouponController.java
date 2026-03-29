@@ -31,10 +31,16 @@ public class CouponController {
         couponService.publishCoupon(id);
     }
 
-    @ApiOperation("查询所有进行中的优惠券列表")
+    @ApiOperation("查询所有进行中的优惠券列表（C 端公开）")
     @GetMapping
     public List<CouponVO> queryAvailableCoupons() {
         return couponService.queryAvailableCoupons();
+    }
+
+    @ApiOperation("管理端：查询当前管理员创建的优惠券（全部状态）")
+    @GetMapping("/manage")
+    public List<CouponVO> queryManageCoupons() {
+        return couponService.queryManageCoupons();
     }
 
     @ApiOperation("用户抢券（秒杀）：Lua 原子扣减 Redis 库存，成功后异步落库")

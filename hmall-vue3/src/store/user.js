@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia'
 
+/** 未登录时展示用（不含 balance，避免顶栏误显示「余额 ¥0」） */
+export const GUEST_USER_DISPLAY = Object.freeze({
+  username: '未登录'
+})
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     userInfo: JSON.parse(sessionStorage.getItem('user-info') || 'null'),

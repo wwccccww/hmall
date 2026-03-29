@@ -1,7 +1,9 @@
 package com.hmall.promotion.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.exception.BizIllegalException;
+import com.hmall.common.exception.UnauthorizedException;
 import com.hmall.common.utils.BeanUtils;
 import com.hmall.common.utils.UserContext;
 import com.hmall.promotion.domain.dto.CouponFormDTO;
@@ -68,18 +70,30 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
 
     @Override
     public Long createCoupon(CouponFormDTO form) {
+        Long creatorId = UserContext.getUser();
+        if (creatorId == null) {
+            throw new UnauthorizedException("请先登录后再创建优惠券");
+        }
         Coupon coupon = BeanUtils.copyBean(form, Coupon.class);
         coupon.setStock(form.getPublishCount()); // 初始库存 = 发行总量
         coupon.setStatus(1);                     // 草稿状态
+        coupon.setCreatorId(creatorId);
         save(coupon);
         return coupon.getId();
     }
 
     @Override
     public void publishCoupon(Long id) {
+        Long uid = UserContext.getUser();
+        if (uid == null) {
+            throw new UnauthorizedException("请先登录");
+        }
         Coupon coupon = getById(id);
         if (coupon == null) {
             throw new BizIllegalException("优惠券不存在");
+        }
+        if (coupon.getCreatorId() != null && !coupon.getCreatorId().equals(uid)) {
+            throw new BizIllegalException("无权发布他人创建的优惠券");
         }
         if (coupon.getStatus() != 1) {
             throw new BizIllegalException("只有草稿状态的优惠券可以发布");
@@ -157,6 +171,19 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         List<Coupon> coupons = lambdaQuery()
                 .eq(Coupon::getStatus, 2)
                 .list();
+        return BeanUtils.copyList(coupons, CouponVO.class);
+    }
+
+    @Override
+    public List<CouponVO> queryManageCoupons() {
+        Long creatorId = UserContext.getUser();
+        if (creatorId == null) {
+            throw new UnauthorizedException("请先登录");
+        }
+        List<Coupon> coupons = list(
+                Wrappers.<Coupon>lambdaQuery()
+                        .eq(Coupon::getCreatorId, creatorId)
+                        .orderByDesc(Coupon::getCreateTime));
         return BeanUtils.copyList(coupons, CouponVO.class);
     }
 }

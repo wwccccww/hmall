@@ -41,7 +41,8 @@
             "mainClass": "com.hmall.item.ItemApplication",
             "projectName": "item-service",
             "args": "",
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "vmArgs": " -Dcom.sun.management.jmxremote"
         },
         {
             "type": "java",
@@ -51,7 +52,8 @@
             "mainClass": "com.hmall.pay.PayApplication",
             "projectName": "pay-service",
             "args": "",
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "vmArgs": " -Dcom.sun.management.jmxremote"
         },
         {
             "type": "java",
@@ -60,6 +62,16 @@
             "cwd": "${workspaceFolder}",
             "mainClass": "com.hmall.user.UserApplication",
             "projectName": "user-service",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-PromotionApplication<promotion-service>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.hmall.promotion.PromotionApplication",
+            "projectName": "promotion-service",
             "args": "",
             "envFile": "${workspaceFolder}/.env"
         }

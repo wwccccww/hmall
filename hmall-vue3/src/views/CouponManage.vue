@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Plus, Send, Ticket, BadgePercent, RefreshCw, CheckCircle2 } from 'lucide-vue-next'
-import { createCoupon, publishCoupon, getAvailableCoupons } from '@/api/coupon'
+import { createCoupon, publishCoupon, getManageCoupons } from '@/api/coupon'
 import { showApiErrorAlert } from '@/utils/apiError'
 
 // ============================================================
@@ -36,7 +36,7 @@ const toISOLocal = (datetimeLocal) =>
 // ============================================================
 const loadCoupons = async () => {
   try {
-    const res = await getAvailableCoupons()
+    const res = await getManageCoupons({ silentError: true })
     coupons.value = Array.isArray(res) ? res : []
   } catch (e) {
     showApiErrorAlert(e)
@@ -61,7 +61,7 @@ const handleCreate = async () => {
       beginTime: toISOLocal(form.value.beginTime),
       endTime: toISOLocal(form.value.endTime)
     }
-    const newId = await createCoupon(payload)
+    const newId = await createCoupon(payload, { silentError: true })
     alert(`优惠券创建成功（ID: ${newId}），请发布以开放领取`)
     resetForm()
     loadCoupons()
@@ -79,7 +79,7 @@ const handlePublish = async (coupon) => {
   if (publishingId.value === coupon.id) return
   publishingId.value = coupon.id
   try {
-    await publishCoupon(coupon.id)
+    await publishCoupon(coupon.id, { silentError: true })
     alert(`「${coupon.name}」已发布，用户可开始领取`)
     loadCoupons()
   } catch (e) {
@@ -119,7 +119,7 @@ onMounted(loadCoupons)
     <div class="flex items-center justify-between">
       <div class="space-y-1">
         <h1 class="text-2xl font-bold tracking-tight">优惠券运营</h1>
-        <p class="text-gray-400 text-sm">创建限量优惠券并发布到 Redis，用户可实时秒杀领取</p>
+        <p class="text-gray-400 text-sm">仅展示当前登录管理员创建的券；创建后发布到 Redis，用户可在领券中心秒杀领取</p>
       </div>
       <button @click="loadCoupons" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
         <RefreshCw :size="16" stroke-width="1.5" class="text-gray-400" />

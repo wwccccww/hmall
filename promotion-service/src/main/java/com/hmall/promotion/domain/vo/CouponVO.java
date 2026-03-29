@@ -36,4 +36,7 @@ public class CouponVO {
 
     @ApiModelProperty("状态：1=草稿 2=进行中 3=已结束 4=暂停")
     private Integer status;
+
+    @ApiModelProperty("创建者用户ID")
+    private Long creatorId;
 }

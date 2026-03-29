@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSearchStore } from '../store/search'
+import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
 import { getItemPage } from '@/api/item'
 import { 
@@ -36,14 +37,14 @@ const fallbackFeatured = [
 
 const scrollY = ref(0)
 const handleScroll = () => { scrollY.value = window.scrollY }
-const userInfo = ref(null)
 
 const router = useRouter()
+const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
+const isLoggedIn = computed(() => !!userStore.token)
 
 const logout = () => {
-  sessionStorage.removeItem('token')
-  sessionStorage.removeItem('user-info')
-  userInfo.value = null
+  userStore.clearUserInfo()
   router.push('/login')
 }
 
@@ -88,14 +89,8 @@ watch(activeCategory, () => {
   loadItems()
 })
 
-onMounted(() => { 
+onMounted(() => {
   window.addEventListener('scroll', handleScroll)
-  const info = sessionStorage.getItem('user-info')
-  if (info) {
-    try {
-      userInfo.value = JSON.parse(info)
-    } catch(e) {}
-  }
   loadItems()
 })
 onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
@@ -136,7 +131,7 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
           >
             <Search :size="18" stroke-width="1.5" />
           </button>
-          <template v-if="userInfo">
+          <template v-if="isLoggedIn && userInfo">
             <div class="hidden sm:flex items-center gap-3">
               <div class="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-black font-bold text-xs border border-gray-200">
                 {{ userInfo.username ? userInfo.username.charAt(0).toUpperCase() : 'U' }}

@@ -54,6 +54,9 @@ public class Coupon implements Serializable {
      */
     private Integer status;
 
+    /** 创建者用户 ID（管理员），由网关注入 user-info */
+    private Long creatorId;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
