@@ -73,17 +73,10 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
         </dependency>
-        <!--AMQP依赖-->
+        <!-- Rabbit：MqConfig 在 spring.factories 中自动装配，不能 optional，否则下游（如 item-service 测试）类路径无 MessageConverter -->
         <dependency>
-            <groupId>org.springframework.amqp</groupId>
-            <artifactId>spring-amqp</artifactId>
-            <scope>true</scope>
-        </dependency>
-        <!--Spring整合Rabbit依赖-->
-        <dependency>
-            <groupId>org.springframework.amqp</groupId>
-            <artifactId>spring-rabbit</artifactId>
-            <scope>provided</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
         <!--json处理-->
         <dependency>

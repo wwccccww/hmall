@@ -12,6 +12,7 @@ import com.hmall.cart.domain.vo.CartVO;
 import com.hmall.cart.mapper.CartMapper;
 import com.hmall.cart.service.ICartService;
 import com.hmall.common.exception.BizIllegalException;
+import com.hmall.common.exception.UnauthorizedException;
 import com.hmall.common.utils.BeanUtils;
 import com.hmall.common.utils.CollUtils;
 import com.hmall.common.utils.UserContext;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -37,8 +39,11 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
 
     @Override
     public void addItem2Cart(CartFormDTO cartFormDTO) {
-        // 1.获取登录用户
+        // 1.获取登录用户（网关需在转发请求中携带 user-info，否则此处为 null）
         Long userId = UserContext.getUser();
+        if (userId == null) {
+            throw new UnauthorizedException("未登录或网关未传递用户信息，请重新登录");
+        }
 
         log.info("addItem2Cart:" + cartFormDTO.toString());
         log.info(this.getClass().getName() + ":" + userId);
@@ -57,6 +62,12 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         Cart cart = BeanUtils.copyBean(cartFormDTO, Cart.class);
         // 3.2.保存当前用户
         cart.setUserId(userId);
+        if (cart.getNum() == null || cart.getNum() < 1) {
+            cart.setNum(1);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        cart.setCreateTime(now);
+        cart.setUpdateTime(now);
         // 3.3.保存到数据库
         save(cart);
     }
@@ -122,7 +133,9 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         Long count = lambdaQuery().eq(Cart::getUserId, userId).count();
         log.info("用户购物车当前最大数量限制:" + cartProperties.getMaxAmount());
         if (count >= cartProperties.getMaxAmount()) {
-            throw new BizIllegalException(StrUtil.format("用户购物车课程不能超过{}", cartProperties.getMaxAmount()));
+            throw new BizIllegalException(StrUtil.format(
+                    "超过购物车购买种类数量：购物车最多只能包含 {} 种不同商品，请先删除部分商品后再添加",
+                    cartProperties.getMaxAmount()));
         }
     }
 

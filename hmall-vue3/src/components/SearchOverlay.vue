@@ -1,13 +1,46 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { Search, X, ArrowRight, Loader2, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { Search, X, ArrowRight, Loader2, ShoppingBag, ChevronLeft, ChevronRight, Plus } from 'lucide-vue-next'
 import { useSearchStore } from '../store/search'
+import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
+import { addCartItem } from '@/api/cart'
 
 const route = useRoute()
+const router = useRouter()
 const searchStore = useSearchStore()
+const userStore = useUserStore()
 const { searchQuery, results, pageNo, totalPages, totalItems, isLoading, showSearch } = storeToRefs(searchStore)
+
+const handleAddToCart = async (item) => {
+  // 1. Pre-check login status via reactive store
+  if (!userStore.isLoggedIn) {
+     router.push({ path: '/login', query: { redirect: route.fullPath } })
+     return
+  }
+  
+  try {
+    // 2. Add to cart using backend service
+    await addCartItem({
+      itemId: item.id,
+      num: 1,
+      name: item.name,
+      price: item.price * 100, // convert back to cents
+      image: item.img,
+      category: item.category,
+      spec: '{}'
+    })
+    // 3. Navigate to cart to show success
+    router.push('/cart')
+  } catch (e) {
+    // Only redirect to login if it's REALLY a 401
+    if (e.response?.status === 401) {
+      userStore.clearUserInfo()
+      router.push({ path: '/login', query: { redirect: route.fullPath } })
+    }
+  }
+}
 
 const inputRef = ref(null)
 const localQuery = ref(searchQuery.value)
@@ -140,23 +173,41 @@ onUnmounted(() => {
           <!-- Results -->
           <div v-if="results.length > 0" class="space-y-12 pb-32">
             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">发现相关单品 ({{ totalItems }})</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <router-link 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+              <div
                 v-for="item in results" 
                 :key="item.id"
-                :to="'/product/' + item.id"
-                class="flex items-center gap-6 p-6 rounded-3xl border border-transparent hover:border-gray-100 hover:bg-gray-50/50 transition-all group animate-spa-reveal"
+                class="flex min-w-0 items-center gap-4 p-5 md:p-6 rounded-3xl border border-transparent hover:border-gray-100 hover:bg-gray-50/50 transition-all group animate-spa-reveal relative"
               >
-                <div class="w-24 h-24 bg-[#F9FAFB] rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <img :src="item.img" class="w-16 h-16 object-contain group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                <!-- Clickable Image/Info to view details（min-w-0 + overflow 防止长标题撑破网格列） -->
+                <div
+                  @click="router.push('/product/' + item.id)"
+                  class="min-w-0 flex-1 flex items-center gap-4 md:gap-6 cursor-pointer overflow-hidden"
+                >
+                  <div class="w-20 h-20 md:w-24 md:h-24 bg-[#F9FAFB] rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <img :src="item.img" class="w-14 h-14 md:w-16 md:h-16 object-contain group-hover:scale-110 transition-transform duration-500" loading="lazy">
+                  </div>
+                  <div class="min-w-0 flex-1 overflow-hidden">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 truncate">{{ item.category }}</p>
+                    <h4 class="text-base md:text-lg font-semibold text-gray-900 line-clamp-2 leading-snug break-words">{{ item.name }}</h4>
+                    <p class="text-gray-500 mt-1 text-sm italic font-medium tabular-nums">¥{{ item.price }}</p>
+                  </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{{ item.category }}</p>
-                  <h4 class="text-lg font-semibold text-gray-900 truncate">{{ item.name }}</h4>
-                  <p class="text-gray-500 mt-1 italic font-medium">¥{{ item.price }}</p>
+
+                <!-- Quick Actions -->
+                <div class="flex flex-shrink-0 items-center gap-2">
+                  <button 
+                    @click.stop="handleAddToCart(item)"
+                    class="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:bg-black hover:text-white hover:border-black transition-all shadow-sm group/btn"
+                    title="加入购物袋"
+                  >
+                    <Plus :size="18" stroke-width="2.5" class="group-hover/btn:rotate-90 transition-transform" />
+                  </button>
+                  <button @click="router.push('/product/' + item.id)" class="w-10 h-10 flex items-center justify-center text-gray-200 group-hover:text-black transition-all">
+                    <ArrowRight :size="18" class="group-hover:translate-x-1 transition-all" />
+                  </button>
                 </div>
-                <ArrowRight :size="18" class="text-gray-300 group-hover:text-black group-hover:translate-x-1 transition-all" />
-              </router-link>
+              </div>
             </div>
 
             <!-- Enhanced Pagination -->

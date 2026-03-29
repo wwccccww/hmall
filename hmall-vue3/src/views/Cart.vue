@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ShoppingBag, ChevronLeft, Trash2, ArrowRight, Minus, Plus, MapPin, CheckCircle2, Circle } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
-import request from '../utils/request'
+import { getCarts, getAddresses, updateCartItem, deleteCartItem, createOrder } from '@/api'
 
 const router = useRouter()
 
@@ -13,7 +13,7 @@ const selectedAddressId = ref(null)
 onMounted(async () => {
   // 获取购物车
   try {
-    const res = await request.get('/carts')
+    const res = await getCarts({ silentError: true })
     if (res && res.length > 0) {
       cartItems.value = res.map(i => ({
         id: i.id,
@@ -37,7 +37,7 @@ onMounted(async () => {
 
   // 获取地址
   try {
-    const addrRes = await request.get('/addresses')
+    const addrRes = await getAddresses({ silentError: true })
     addresses.value = addrRes
     const defaultAddr = addrRes.find(a => a.isDefault)
     if (defaultAddr) selectedAddressId.value = defaultAddr.id
@@ -79,7 +79,7 @@ const updateQuantity = async (item, delta) => {
   }
 
   try {
-    await request.put('/carts', { id: item.id, num: newQ })
+    await updateCartItem({ id: item.id, num: newQ })
     item.quantity = newQ
   } catch(e) {
     console.error("更新数量失败", e)
@@ -90,7 +90,7 @@ const updateQuantity = async (item, delta) => {
 
 const removeItem = async (id) => {
   try {
-    await request.delete(`/carts/${id}`)
+    await deleteCartItem(id)
     cartItems.value = cartItems.value.filter(item => item.id !== id)
   } catch(e) {
     cartItems.value = cartItems.value.filter(item => item.id !== id)
@@ -105,16 +105,15 @@ const checkout = async () => {
   try {
     const details = selectedItems.map(i => ({ itemId: i.itemId || i.id, num: i.quantity }))
     
-    const orderId = await request.post('/orders', {
+    const orderId = await createOrder({
       details,
-      paymentType: 3, 
+      paymentType: 3,
       addressId: selectedAddressId.value
     })
     console.log("收到的订单id是: " , orderId)
     router.push({ path: '/pay', query: { id: orderId } })
-  } catch(e) {
-    console.error("生成订单失败", e)
-    alert("结算失败，请检查网络或库存")
+  } catch (e) {
+    console.error('生成订单失败', e)
   }
 }
 </script>

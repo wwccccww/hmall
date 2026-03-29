@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSearchStore } from '../store/search'
 import { storeToRefs } from 'pinia'
-import request from '../utils/request'
+import { getItemPage } from '@/api/item'
 import { 
   ShoppingBag, 
   Search, 
@@ -20,7 +20,7 @@ import {
   X
 } from 'lucide-vue-next'
 
-const categories = ['All', 'iPhone', 'Audio', 'iPad', 'Mac', 'Watch']
+const categories = ['All', '手机', '电视', '电脑', '衣服', '鞋子']
 const activeCategory = ref('All')
 const isMenuOpen = ref(false)
 
@@ -49,13 +49,14 @@ const logout = () => {
 
 const loadItems = async () => {
   try {
-    const res = await request.get('/items/page', {
-      params: { 
-        pageNo: 1, 
+    const res = await getItemPage(
+      {
+        pageNo: 1,
         pageSize: 12,
         category: activeCategory.value === 'All' ? null : activeCategory.value
-      }
-    })
+      },
+      { silentError: true }
+    )
     if (res && res.list && res.list.length > 0) {
       featured.value = res.list.map(item => ({
         id: item.id,
@@ -71,6 +72,15 @@ const loadItems = async () => {
   } catch (e) {
     console.error("Failed to load products, using fallback", e)
     featured.value = fallbackFeatured
+  }
+}
+
+const handleCategoryClick = (cat) => {
+  activeCategory.value = cat
+  // 如果点击非 'All' 的分类，则自动开启全局搜索层并展示搜索结果
+  if (cat !== 'All') {
+    searchStore.setSearchQuery(cat)
+    searchStore.toggleSearch(true)
   }
 }
 
@@ -160,7 +170,7 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
             <button 
               v-for="cat in categories" 
               :key="cat" 
-              @click="activeCategory = cat" 
+              @click="handleCategoryClick(cat)" 
               class="px-6 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all whitespace-nowrap"
               :class="activeCategory === cat ? 'bg-black text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'"
             >

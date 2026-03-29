@@ -11,7 +11,9 @@ server:
 spring:
   application:
     name: user-service
-
+  output:
+    ansi:
+      enabled: ALWAYS
   datasource:
     url: jdbc:mysql://${hm.db.host}:3306/hm-user?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
     driver-class-name: com.mysql.cj.jdbc.Driver

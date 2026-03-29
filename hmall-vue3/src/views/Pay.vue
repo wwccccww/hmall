@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { Check, ArrowRight, ShieldCheck, QrCode } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
-import request from '../utils/request'
+import { getOrderById, createPayOrder, payOrder, getCurrentUser } from '@/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -16,7 +16,7 @@ const payOrderNo = ref('')
 onMounted(async () => {
   if (orderId.value) {
     try {
-      const res = await request.get('/orders/' + orderId.value)
+      const res = await getOrderById(orderId.value)
       console.log("获取到的订单详细信息：", res)
       console.log("订单ID：", orderId.value)
       // 关键修复：兼容数组包装情况
@@ -30,18 +30,17 @@ onMounted(async () => {
           amount.value = (finalFee / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
         }
         
-        const pno = await request.post('/pay-orders', {
+        const pno = await createPayOrder({
           bizOrderNo: finalOrderId,
           amount: finalFee,
           payType: 5,
-          orderInfo: "黑马商城商品",
-          payChannelCode: "balance"
+          orderInfo: '黑马商城商品',
+          payChannelCode: 'balance'
         })
         payOrderNo.value = pno
       }
-    } catch(e) {
-      console.warn("数据加载失败", e)
-      alert("支付单初始化请求失败，请检查后端服务")
+    } catch (e) {
+      console.warn('数据加载失败', e)
     }
   }
 })
@@ -53,14 +52,14 @@ const handlePay = async () => {
   try {
     console.log("PayOrderNo支付: ", payOrderNo.value)
     if (payOrderNo.value) {
-      await request.post('/pay-orders/' + payOrderNo.value, { 
-        id: payOrderNo.value, 
-        pw: "123" // 测试密码
+      await payOrder(payOrderNo.value, {
+        id: payOrderNo.value,
+        pw: '123' // 测试密码
       })
       
       // 支付成功后，立即拉取最新的用户信息（包括余额）并同步到缓存
       try {
-        const user = await request.get('/users/me')
+        const user = await getCurrentUser()
         if (user) {
           sessionStorage.setItem("user-info", JSON.stringify(user))
           // 同时也发送一个全局事件或简单刷新缓存，让 Navbar 感知到
@@ -76,9 +75,8 @@ const handlePay = async () => {
       alert("支付单初始化失败，请刷新页面重试")
       isPaying.value = false
     }
-  } catch(e) {
-    console.error("支付请求详细错误：", e)
-    alert("支付失败，可能是后端服务未运行或连接超时")
+  } catch (e) {
+    console.error('支付请求详细错误：', e)
     isPaying.value = false
   }
 }
@@ -140,7 +138,7 @@ const backToHome = () => {
        <p class="text-gray-500 mb-10 text-sm leading-relaxed">您的订单已通过安全网关结清。我们将在 2 个完整周期内启动极速履约发货流程。</p>
        
        <button @click="backToHome" class="w-full h-12 border border-gray-200 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors">
-          返回控制中心
+          返回
        </button>
     </div>
 

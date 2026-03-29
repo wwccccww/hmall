@@ -12,7 +12,7 @@ import {
   Package,
   AlertCircle
 } from 'lucide-vue-next'
-import request from '../utils/request'
+import { getItemPage } from '@/api/item'
 
 const goods = ref([])
 const total = ref(0)
@@ -20,9 +20,7 @@ const pageNo = ref(1)
 
 const loadGoods = async () => {
   try {
-    const res = await request.get('/items/page', {
-      params: { pageNo: pageNo.value, pageSize: 10 }
-    })
+    const res = await getItemPage({ pageNo: pageNo.value, pageSize: 10 }, { silentError: true })
     if (res && res.list) {
       goods.value = res.list.map(item => ({
         id: item.id,

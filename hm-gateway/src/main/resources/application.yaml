@@ -1,35 +1,6 @@
 server:
   port: 8080
 
-#    gateway:
-#      routes:
-#        - id: cart
-#          uri: lb://cart-service
-#          predicates:
-#            - Path=/carts/**
-#
-#        - id: item
-#          uri: lb://item-service
-#          predicates:
-#            - Path=/items/**,/search/**
-#
-#        - id: pay
-#          uri: lb://pay-service
-#          predicates:
-#            - Path=/pay-orders/**
-#
-#        - id: trade
-#          uri: lb://trade-service
-#          predicates:
-#            - Path=/orders/**
-#
-#        - id: user
-#          uri: lb://user-service
-#          predicates:
-#            - Path=/users/**,/addresses/**
-#      default-filters:
-#        - AddRequestHeader=Key,value
-
 
 hm:
   jwt:
@@ -44,3 +15,7 @@ hm:
       - /items/**
       - /hi
 
+spring:
+  output:
+    ansi:
+      enabled: ALWAYS

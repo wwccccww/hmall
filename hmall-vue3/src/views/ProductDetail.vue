@@ -2,10 +2,12 @@
 import { ref, onMounted } from 'vue'
 import { ArrowLeft, ShoppingBag, CreditCard, ChevronDown, Check } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
-import request from '../utils/request'
+import { getItemById, getCarts, addCartItem, createOrder } from '@/api'
+import { useUserStore } from '../store/user'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
 const product = ref({
   id: route.params.id,
@@ -25,7 +27,7 @@ const quantityInCart = ref(0) // 记录该商品在购物车中的现有数量
 
 onMounted(async () => {
   try {
-    const res = await request.get(`/items/${route.params.id}`)
+    const res = await getItemById(route.params.id)
     if (res) {
       // 解析规格信息
       let parsedSpecs = []
@@ -57,8 +59,10 @@ onMounted(async () => {
 
     // 获取当前购物车状态，检查该商品是否已存在于购物车
     try {
-      const carts = await request.get('/carts')
-      const existing = carts.find(c => c.itemId === product.value.id)
+      const carts = await getCarts({ silentError: true })
+      const existing = carts.find(
+        c => String(c.itemId) === String(product.value.id)
+      )
       if (existing) quantityInCart.value = existing.num
     } catch(e) {
       console.warn("未能获取购物车实时状态，跳过预检")
@@ -70,6 +74,11 @@ onMounted(async () => {
 })
 
 const addToCart = async () => {
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+
   // 综合检查：当前已选 + 1 是否超过库存
   const nextQuantity = quantityInCart.value + 1
   if (product.value.stock !== undefined && nextQuantity > product.value.stock) {
@@ -78,36 +87,40 @@ const addToCart = async () => {
   }
 
   try {
-    await request.post('/carts', {
+    await addCartItem({
+      // 商品 id 来自后端 Long 序列化成的字符串，勿用 Number()，否则超过 JS 安全整数会精度丢失导致入库失败/500
       itemId: product.value.id,
       num: 1,
       name: product.value.name,
-      price: product.value.price * 100,
+      price: Math.round(Number(product.value.price) * 100),
       image: product.value.img,
       category: '手机',
       brand: product.value.brand,
-      spec: JSON.stringify({ "容量": selectedSpec.value, "颜色": selectedColor.value })
+      spec: JSON.stringify({ 容量: selectedSpec.value, 颜色: selectedColor.value })
     })
     
     // 更新本地缓存的数量，防止连续点击绕过检查
     quantityInCart.value += 1
     
     router.push('/cart')
-  } catch(e) {
-    console.error("加入购物袋失败，即将跳转登录页...", e)
-    router.push('/login')
+  } catch (e) {
+    console.error('加入购物袋失败', e)
   }
 }
 
 const goPay = async () => {
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
   try {
     const details = [{ itemId: product.value.id, num: 1 }]
     
     // 向后端 trade-service 申请创建订单
-    const orderId = await request.post('/orders', {
+    const orderId = await createOrder({
       details,
       paymentType: 3, // 对应后端的余额支付
-      addressId: 1    // 替换为数据库中真实存在的地址 ID
+      addressId: 1 // 替换为数据库中真实存在的地址 ID
     })
     
     // 携带生成的订单 ID 跳转至支付页
@@ -115,13 +128,8 @@ const goPay = async () => {
       path: '/pay', 
       query: { id: orderId } 
     })
-  } catch(e) {
-    console.error("立即结算失败", e)
-    if (e.response?.status === 401) {
-      router.push('/login')
-    } else {
-      alert("订单生成异常，请稍后刷新重试")
-    }
+  } catch (e) {
+    console.error('立即结算失败', e)
   }
 }
 </script>

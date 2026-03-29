@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import request from '../utils/request'
+import { getSearchList } from '@/api/search'
 
 export const useSearchStore = defineStore('search', {
   state: () => ({
@@ -24,13 +24,14 @@ export const useSearchStore = defineStore('search', {
       this.isLoading = true
       this.pageNo = page
       try {
-        const res = await request.get('/search/list', {
-          params: {
+        const res = await getSearchList(
+          {
             key: this.searchQuery,
             pageNo: this.pageNo,
             pageSize: this.pageSize
-          }
-        })
+          },
+          { silentError: true }
+        )
         this.results = res.list.map(item => ({
           id: item.id,
           name: item.name,

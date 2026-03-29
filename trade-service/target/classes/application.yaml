@@ -24,6 +24,9 @@ spring:
     username: sail
     password: 123
 
+  output:
+    ansi:
+      enabled: ALWAYS
 mybatis-plus:
   configuration:
     default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler

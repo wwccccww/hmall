@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Shield, User, Lock, ArrowRight, Eye, EyeOff } from 'lucide-vue-next'
-import request from '../utils/request'
+import { login as loginApi } from '@/api/user'
+import { useUserStore } from '../store/user'
 
 /**
  * Aesthetic: Swiss Spa Minimalist
@@ -15,9 +16,12 @@ interface LoginForm {
 }
 
 const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
+
+const loginForm = reactive<LoginForm>({ username: '', password: '' })
 const isLoading = ref(false)
 const showPassword = ref(false)
-const loginForm = ref<LoginForm>({ username: '', password: '' })
 const isFocused = ref<string | null>(null)
 
 const handleLogin = async () => {
@@ -25,21 +29,44 @@ const handleLogin = async () => {
   isLoading.value = true
   
   try {
-    const data = await request.post('/users/login', {
-      username: loginForm.value.username,
-      password: loginForm.value.password
+    const data = await loginApi({
+      username: loginForm.username,
+      password: loginForm.password
     })
-    
-    // data 包含了 token 和其余 user 字段
-    const { token, ...user } = data
-    sessionStorage.setItem("token", token)
-    sessionStorage.setItem("user-info", JSON.stringify(user))
-    console.log("user信息:" + user)
-    console.log("token信息:" + token)
+
+    const body = data as Record<string, unknown> | null | undefined
+    const payload =
+      body && body.code === 200 && body.data != null && typeof body.data === 'object'
+        ? (body.data as Record<string, unknown>)
+        : body
+    if (!payload || typeof payload !== 'object') {
+      alert('登录异常：响应格式不正确')
+      isLoading.value = false
+      return
+    }
+    const tokenRaw = payload.token
+    const token = typeof tokenRaw === 'string' ? tokenRaw.trim() : ''
+    if (!token) {
+      alert('登录异常：未获取到有效令牌，请稍后重试')
+      isLoading.value = false
+      return
+    }
+    const { token: _t, ...user } = payload
+    userStore.setUserInfo(user as Parameters<typeof userStore.setUserInfo>[0], token)
+
     isLoading.value = false
-    router.push('/')
+
+    const redirect = route.query.redirect
+    const path = typeof redirect === 'string' ? redirect : ''
+    if (path.startsWith('/') && !path.startsWith('//')) {
+      router.replace(path)
+    } else if (window.history.length > 1) {
+      router.back()
+    } else {
+      router.push('/')
+    }
   } catch (err) {
-    alert("登录失败，请检查用户名或密码")
+    // 失败提示由 request 全局拦截器统一弹窗（后端 R.msg）
     isLoading.value = false
   }
 }

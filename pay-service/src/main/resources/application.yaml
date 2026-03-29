@@ -4,7 +4,7 @@ spring:
   application:
     name: pay-service
   profiles:
-    active: dev
+    active: local
 
   datasource:
     url: jdbc:mysql://${hm.db.host}:3306/hm-pay?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
@@ -24,6 +24,9 @@ spring:
     username: sail
     password: 123
 
+  output:
+    ansi:
+      enabled: ALWAYS
 mybatis-plus:
   configuration:
     default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler

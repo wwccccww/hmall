@@ -9,6 +9,8 @@ import lombok.Data;
 public class CartFormDTO {
     @ApiModelProperty("商品id")
     private Long itemId;
+    @ApiModelProperty("购买数量")
+    private Integer num;
     @ApiModelProperty("商品标题")
     private String name;
     @ApiModelProperty("商品动态属性键值集")
