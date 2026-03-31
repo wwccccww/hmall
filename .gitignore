@@ -9,3 +9,18 @@ log/
 *.svg
 **/hmall-nginx/
 
+# 排除所有编译生成的字节码文件
+*.class
+
+# 排除 Maven 的输出目录
+target/
+
+# 排除 Gradle 的输出目录
+build/
+
+# 排除 IDE 相关的临时文件（如 Cursor/VS Code/IntelliJ 产生的文件）
+.settings/
+.classpath
+.project
+.idea/
+*.iml
