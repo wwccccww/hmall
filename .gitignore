@@ -9,6 +9,7 @@ log/
 *.svg
 **/hmall-nginx/
 
+
 # 排除所有编译生成的字节码文件
 *.class
 
