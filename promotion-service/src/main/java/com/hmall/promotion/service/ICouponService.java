@@ -4,9 +4,15 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.hmall.common.domain.PageDTO;
 import com.hmall.common.domain.PageQuery;
 import com.hmall.promotion.domain.dto.CouponFormDTO;
+import com.hmall.promotion.domain.dto.CouponPreviewRequest;
+import com.hmall.promotion.domain.dto.CouponRedeemRequest;
+import com.hmall.promotion.domain.dto.CouponAvailableRequest;
 import com.hmall.promotion.domain.po.Coupon;
 import com.hmall.promotion.domain.vo.CouponVO;
 import com.hmall.promotion.domain.vo.CouponReceiveRecordVO;
+import com.hmall.promotion.domain.vo.CouponPreviewVO;
+import com.hmall.promotion.domain.vo.MyCouponVO;
+import com.hmall.promotion.domain.vo.AvailableCouponVO;
 
 import java.util.List;
 import java.util.Map;
@@ -39,10 +45,19 @@ public interface ICouponService extends IService<Coupon> {
     void receiveCoupon(Long couponId);
 
     /** 查询当前用户的全部领券记录 */
-    List<CouponVO> queryMyCoupons();
+    List<MyCouponVO> queryMyCoupons();
+
+    /** 购物车可用券：输入商品明细，返回可用券列表（含立减金额试算） */
+    List<AvailableCouponVO> queryAvailableForCart(CouponAvailableRequest request);
 
     /** 管理端：分页查询某张券的领取记录（user_coupon） */
     PageDTO<CouponReceiveRecordVO> queryCouponReceiveRecords(Long couponId, PageQuery pageQuery);
+
+    /** C端：试算指定优惠券在当前商品列表下的优惠金额 */
+    CouponPreviewVO previewCoupon(CouponPreviewRequest request);
+
+    /** C端：核销用券（支付成功后调用） */
+    void redeemCoupon(CouponRedeemRequest request);
 
     /** 查询所有进行中的优惠券列表（C 端领券中心，展示全平台已发布券） */
     List<CouponVO> queryAvailableCoupons();

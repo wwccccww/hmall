@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Plus, Send, Ticket, BadgePercent, RefreshCw, CheckCircle2, Clock, Users } from 'lucide-vue-next'
-import { createCoupon, publishCoupon, getManageCoupons, getCouponReceiveRecords } from '@/api/coupon'
+import { createCoupon, publishCoupon, getManageCoupons, getCouponReceiveRecords, getItemCategories } from '@/api/coupon'
 import { showApiErrorAlert } from '@/utils/apiError'
 
 // ============================================================
@@ -57,14 +57,42 @@ const form = ref({
   type: 1,
   discountValue: null,
   threshold: 0,
+  scopeType: 1,
+  categoryNames: [],
   publishCount: null,
   beginTime: '',
   endTime: ''
 })
 
 const resetForm = () => {
-  form.value = { name: '', type: 1, discountValue: null, threshold: 0, publishCount: null, beginTime: '', endTime: '' }
+  form.value = { name: '', type: 1, discountValue: null, threshold: 0, scopeType: 1, categoryNames: [], publishCount: null, beginTime: '', endTime: '' }
 }
+
+// ============================================================
+// 类目列表（用于指定类目券）
+// ============================================================
+const categoryOptions = ref([])
+const categoryKeyword = ref('')
+
+const loadCategories = async () => {
+  try {
+    const res = await getItemCategories({ silentError: true })
+    const list = Array.isArray(res) ? res : []
+    // 后端返回 [{name}]，也兼容 ["手机"] 这种格式
+    categoryOptions.value = list
+      .map(x => (typeof x === 'string' ? x : x?.name))
+      .filter(Boolean)
+  } catch (e) {
+    // 获取失败不阻塞创建券，仍允许手动输入
+    categoryOptions.value = []
+  }
+}
+
+const filteredCategoryOptions = computed(() => {
+  const kw = String(categoryKeyword.value || '').trim()
+  if (!kw) return categoryOptions.value
+  return categoryOptions.value.filter(n => String(n).includes(kw))
+})
 
 // ============================================================
 // 格式转换
@@ -141,15 +169,23 @@ const handleCreate = async () => {
   if (!form.value.discountValue || form.value.discountValue <= 0) { alert('请填写有效的优惠值'); return }
   if (!form.value.publishCount || form.value.publishCount <= 0) { alert('请填写发行总量'); return }
   if (!form.value.beginTime || !form.value.endTime) { alert('请选择活动时间'); return }
+  if (form.value.scopeType === 3 && (!Array.isArray(form.value.categoryNames) || form.value.categoryNames.length === 0)) {
+    alert('请选择“指定类目”时必须选择至少一个类目')
+    return
+  }
 
   submitting.value = true
   try {
+    const categoryNames = form.value.scopeType === 3 ? form.value.categoryNames : null
     const payload = {
       ...form.value,
       discountValue: form.value.type === 1 ? Math.round(form.value.discountValue * 100) : form.value.discountValue,
       threshold: form.value.type === 1 ? Math.round((form.value.threshold || 0) * 100) : 0,
       beginTime: toISOLocal(form.value.beginTime),
       endTime: toISOLocal(form.value.endTime)
+      ,
+      scopeType: form.value.scopeType,
+      categoryNames
     }
     const newId = await createCoupon(payload, { silentError: true })
     alert(`优惠券创建成功（ID: ${newId}），请发布以开放领取`)
@@ -189,6 +225,7 @@ onMounted(() => {
   // 每 30 秒重新拉一次（含最新 Redis 库存）
   pollTimer = setInterval(loadCoupons, 30_000)
   loadCoupons()
+  loadCategories()
 })
 
 onUnmounted(() => {
@@ -288,6 +325,41 @@ onUnmounted(() => {
             placeholder="例如：100"
             class="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-black transition-colors"
           />
+        </div>
+
+        <!-- 适用范围 -->
+        <div class="space-y-1.5">
+          <label class="text-[11px] font-bold uppercase tracking-widest text-gray-400">适用范围</label>
+          <select
+            v-model.number="form.scopeType"
+            class="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-black transition-colors bg-white"
+          >
+            <option :value="1">全场通用</option>
+            <option :value="3">指定类目</option>
+          </select>
+        </div>
+
+        <!-- 指定类目（scopeType=3） -->
+        <div v-if="form.scopeType === 3" class="space-y-2 md:col-span-2">
+          <div class="flex items-center justify-between gap-3">
+            <label class="text-[11px] font-bold uppercase tracking-widest text-gray-400">指定类目（多选）</label>
+            <input
+              v-model="categoryKeyword"
+              type="text"
+              placeholder="搜索类目…"
+              class="h-9 px-3 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-black transition-colors"
+            />
+          </div>
+          <select
+            v-model="form.categoryNames"
+            multiple
+            class="w-full min-h-[120px] px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-black transition-colors bg-white"
+          >
+            <option v-for="c in filteredCategoryOptions" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <p class="text-[10px] text-gray-400">
+            类目来源：商品表 `item.category` 去重；请选择与商品类目完全一致的名称。
+          </p>
         </div>
 
         <!-- 活动时间 -->

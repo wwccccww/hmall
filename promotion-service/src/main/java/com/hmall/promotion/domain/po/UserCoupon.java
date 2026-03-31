@@ -34,6 +34,12 @@ public class UserCoupon implements Serializable {
     /** 过期时间（同优惠券活动结束时间） */
     private LocalDateTime expiredAt;
 
+    /** 关联订单ID（使用时记录） */
+    private Long orderId;
+
+    /** 使用时间（核销时记录） */
+    private LocalDateTime useTime;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

@@ -29,7 +29,6 @@ public class CommonExceptionAdvice {
     @ExceptionHandler(CommonException.class)
     public Object handleBadRequestException(CommonException e) {
         log.error("自定义异常 -> {} , 异常原因：{}  ",e.getClass().getName(), e.getMessage());
-        log.debug("", e);
         return processResponse(e);
     }
 

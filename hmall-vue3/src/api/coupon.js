@@ -20,6 +20,10 @@ export const getCouponReceiveRecords = (id, extraConfig = {}) =>
 export const getMyCoupons = (extraConfig = {}) =>
   request.get('/coupons/my', extraConfig)
 
+/** 购物车可用券（后端批量试算，返回每张券立减金额） */
+export const getAvailableCouponsForCart = (data, extraConfig = {}) =>
+  request.post('/coupons/available', data, extraConfig)
+
 /** 用户抢券（需登录），id 为优惠券 ID；可传 { silentError: true } 避免与页面 catch 重复弹窗 */
 export const receiveCoupon = (id, extraConfig = {}) =>
   request.post(`/coupons/${id}/receive`, null, extraConfig)
@@ -39,3 +43,7 @@ export const publishCoupon = (id, extraConfig = {}) =>
  */
 export const getRealtimeStock = (ids, extraConfig = {}) =>
   request.get('/coupons/stock', { params: { ids: ids.join(',') }, ...extraConfig })
+
+/** 管理端：查询商品类目列表（item-service），用于创建“指定类目券” */
+export const getItemCategories = (extraConfig = {}) =>
+  request.get('/items/categories', extraConfig)

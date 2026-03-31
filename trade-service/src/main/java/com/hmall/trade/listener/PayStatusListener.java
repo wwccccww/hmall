@@ -21,6 +21,11 @@ public class PayStatusListener {
     ))
     public void listenPaySuccess(Long orderId) {
         log.info("PayStatusListener 监听支付成功消息:{}", orderId);
-        orderService.markOrderPaySuccess(orderId);
+        try {
+            orderService.markOrderPaySuccess(orderId);
+        } catch (Exception e) {
+            // 防止 RabbitListener 因异常反复重试导致控制台刷屏
+            log.error("处理支付成功失败，orderId={}", orderId, e);
+        }
     }
 }

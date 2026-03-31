@@ -3,8 +3,14 @@ package com.hmall.promotion.controller;
 import com.hmall.common.domain.PageDTO;
 import com.hmall.common.domain.PageQuery;
 import com.hmall.promotion.domain.dto.CouponFormDTO;
+import com.hmall.promotion.domain.dto.CouponAvailableRequest;
+import com.hmall.promotion.domain.dto.CouponPreviewRequest;
+import com.hmall.promotion.domain.dto.CouponRedeemRequest;
+import com.hmall.promotion.domain.vo.AvailableCouponVO;
+import com.hmall.promotion.domain.vo.CouponPreviewVO;
 import com.hmall.promotion.domain.vo.CouponReceiveRecordVO;
 import com.hmall.promotion.domain.vo.CouponVO;
+import com.hmall.promotion.domain.vo.MyCouponVO;
 import com.hmall.promotion.service.ICouponService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -63,8 +69,26 @@ public class CouponController {
 
     @ApiOperation("查询我的优惠券列表")
     @GetMapping("/my")
-    public List<CouponVO> queryMyCoupons() {
+    public List<MyCouponVO> queryMyCoupons() {
         return couponService.queryMyCoupons();
+    }
+
+    @ApiOperation("购物车可用券：根据商品明细返回可用券列表（含立减金额）")
+    @PostMapping("/available")
+    public List<AvailableCouponVO> queryAvailableForCart(@Valid @RequestBody CouponAvailableRequest request) {
+        return couponService.queryAvailableForCart(request);
+    }
+
+    @ApiOperation("试算优惠券：根据商品明细计算优惠金额与应付金额（需登录且已领券）")
+    @PostMapping("/preview")
+    public CouponPreviewVO previewCoupon(@Valid @RequestBody CouponPreviewRequest request) {
+        return couponService.previewCoupon(request);
+    }
+
+    @ApiOperation("核销用券：支付成功后调用，将用户券置为已使用并记录订单号")
+    @PostMapping("/redeem")
+    public void redeemCoupon(@Valid @RequestBody CouponRedeemRequest request) {
+        couponService.redeemCoupon(request);
     }
 
     @ApiOperation("批量获取券的 Redis 实时剩余库存（前端实时轮询）")

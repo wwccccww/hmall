@@ -16,6 +16,8 @@ hm:
       - /hi
       # 注意：勿将 /coupons 整体排除，否则 POST /coupons（创建券）也会免登录且无法注入 user-info
       # 领券中心公开列表由 AuthGlobalFilter 内「仅 GET /coupons」单独放行
+      # 内部调用：下单/支付完成核销优惠券（RabbitMQ 线程无用户 token）
+      - /coupons/redeem
 
 spring:
   cloud:

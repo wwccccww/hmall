@@ -17,4 +17,7 @@ public class OrderFormDTO {
     private Integer paymentType;
     @ApiModelProperty("下单商品列表")
     private List<OrderDetailDTO> details;
+
+    @ApiModelProperty("使用的优惠券ID（不使用则不传）")
+    private Long couponId;
 }

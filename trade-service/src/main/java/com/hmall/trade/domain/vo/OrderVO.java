@@ -16,6 +16,12 @@ public class OrderVO {
     private Long id;
     @ApiModelProperty("总金额，单位为分")
     private Integer totalFee;
+    @ApiModelProperty("优惠券ID（不使用则为空）")
+    private Long couponId;
+    @ApiModelProperty("优惠金额（分）")
+    private Integer discountFee;
+    @ApiModelProperty("应付金额（分）")
+    private Integer payFee;
     @ApiModelProperty("支付类型，1、支付宝，2、微信，3、扣减余额")
     private Integer paymentType;
     @ApiModelProperty("用户id")

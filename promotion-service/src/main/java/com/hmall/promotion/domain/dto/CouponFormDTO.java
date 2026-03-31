@@ -7,6 +7,7 @@ import lombok.Data;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.util.List;
 import java.time.LocalDateTime;
 
 @Data
@@ -41,4 +42,16 @@ public class CouponFormDTO {
     @ApiModelProperty("活动结束时间")
     @NotNull(message = "活动结束时间不能为空")
     private LocalDateTime endTime;
+
+    @ApiModelProperty("适用范围：1=全场 3=指定类目")
+    private Integer scopeType = 1;
+
+    @ApiModelProperty("指定类目名称列表（当 scopeType=3 时必填，需与 item.category 完全一致）")
+    private List<String> categoryNames;
+
+    @ApiModelProperty("指定品牌名称列表（当 scopeType=2 时必填，需与 item.brand 完全一致）")
+    private List<String> brandNames;
+
+    @ApiModelProperty("指定商家ID列表（当 scopeType=4 时必填）")
+    private List<Long> shopIds;
 }

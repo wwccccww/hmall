@@ -36,6 +36,13 @@ public class Coupon implements Serializable {
     /** 使用门槛（分），0 = 无门槛 */
     private Integer threshold;
 
+    /**
+     * 适用范围
+     * 1 = 全场
+     * 3 = 指定类目（按 item.category 字符串匹配）
+     */
+    private Integer scopeType;
+
     /** 发行总量 */
     private Integer publishCount;
 

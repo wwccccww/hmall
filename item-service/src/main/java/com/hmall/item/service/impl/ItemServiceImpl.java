@@ -8,6 +8,7 @@ import com.hmall.common.utils.BeanUtils;
 import com.hmall.item.domain.dto.ItemDTO;
 import com.hmall.item.domain.dto.OrderDetailDTO;
 import com.hmall.item.domain.po.Item;
+import com.hmall.item.domain.vo.CategoryVO;
 import com.hmall.item.mapper.ItemMapper;
 import com.hmall.item.service.IItemService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -40,12 +42,15 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
 
     private static final String ITEM_CACHE_KEY      = "item:cache:";
     private static final String ITEM_LOCK_KEY       = "item:lock:";
+    private static final String ITEM_CATEGORIES_KEY = "item:categories";
     /** 正常缓存 TTL（分钟） */
     private static final long   ITEM_CACHE_TTL      = 30L;
     /** 空值缓存 TTL（分钟），防穿透 */
     private static final long   ITEM_CACHE_NULL_TTL = 2L;
     /** 随机 TTL 最大抖动（分钟），防雪崩 */
     private static final long   ITEM_CACHE_TTL_RAND = 10L;
+    /** 类目列表缓存 TTL（小时） */
+    private static final long   ITEM_CATEGORIES_TTL_HOURS = 12L;
 
     private final StringRedisTemplate redisTemplate;
 
@@ -107,6 +112,23 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
         return BeanUtils.copyList(listByIds(ids), ItemDTO.class);
     }
 
+    @Override
+    public List<CategoryVO> queryCategories() {
+        String json = redisTemplate.opsForValue().get(ITEM_CATEGORIES_KEY);
+        if (json != null) {
+            if (json.isEmpty()) return List.of();
+            List<String> names = JSONUtil.toList(json, String.class);
+            return names.stream().map(CategoryVO::new).collect(Collectors.toList());
+        }
+        List<String> names = this.baseMapper.queryDistinctCategories();
+        if (names == null || names.isEmpty()) {
+            redisTemplate.opsForValue().set(ITEM_CATEGORIES_KEY, "", 30, TimeUnit.MINUTES);
+            return List.of();
+        }
+        redisTemplate.opsForValue().set(ITEM_CATEGORIES_KEY, JSONUtil.toJsonStr(names), ITEM_CATEGORIES_TTL_HOURS, TimeUnit.HOURS);
+        return names.stream().map(CategoryVO::new).collect(Collectors.toList());
+    }
+
     // ======================== 写操作（先写 DB，再删缓存） ========================
 
     @Override
@@ -117,7 +139,9 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
         try {
             r = executeBatch(items, (sqlSession, entity) -> sqlSession.update(sqlStatement, entity));
         } catch (Exception e) {
-            throw new BizIllegalException("更新库存异常，可能是库存不足!", e);
+            //throw new BizIllegalException("更新库存异常，可能是库存不足!", e);
+            throw new BizIllegalException("更新库存异常，可能是库存不足!");
+            
         }
         if (!r) {
             throw new BizIllegalException("库存不足！");
@@ -131,6 +155,7 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
         boolean result = super.updateById(entity);
         if (result && entity.getId() != null) {
             evictItemCache(entity.getId());
+            evictCategoriesCache();
         }
         return result;
     }
@@ -140,6 +165,7 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
         boolean result = super.removeById(id);
         if (result) {
             evictItemCache((Long) id);
+            evictCategoriesCache();
         }
         return result;
     }
@@ -161,5 +187,9 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
     private void evictItemCache(Long id) {
         redisTemplate.delete(ITEM_CACHE_KEY + id);
         log.debug("已清除商品缓存, id={}", id);
+    }
+
+    private void evictCategoriesCache() {
+        redisTemplate.delete(ITEM_CATEGORIES_KEY);
     }
 }

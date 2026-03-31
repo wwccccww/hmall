@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ArrowLeft, ShoppingBag, CreditCard, ChevronDown, Check } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { getItemById, getCarts, addCartItem, createOrder } from '@/api'
 import { useUserStore } from '../store/user'
+import { getMyCoupons } from '@/api/coupon'
 
 const router = useRouter()
 const route = useRoute()
@@ -24,6 +25,11 @@ const selectedSpec = ref('')
 const selectedColor = ref('')
 
 const quantityInCart = ref(0) // 记录该商品在购物车中的现有数量
+const myCoupons = ref([])
+const selectedCouponId = ref(null)
+const selectedCoupon = computed(() =>
+  myCoupons.value.find(c => String(c.id) === String(selectedCouponId.value)) || null
+)
 
 onMounted(async () => {
   try {
@@ -70,6 +76,16 @@ onMounted(async () => {
 
   } catch (e) {
     console.error('获取商品详情失败:', e)
+  }
+
+  // 获取我的优惠券（用于立即支付选择）
+  if (userStore.isLoggedIn) {
+    try {
+      const res = await getMyCoupons({ silentError: true })
+      myCoupons.value = Array.isArray(res) ? res : []
+    } catch {
+      myCoupons.value = []
+    }
   }
 })
 
@@ -120,7 +136,8 @@ const goPay = async () => {
     const orderId = await createOrder({
       details,
       paymentType: 3, // 对应后端的余额支付
-      addressId: 1 // 替换为数据库中真实存在的地址 ID
+      addressId: 1, // 替换为数据库中真实存在的地址 ID
+      couponId: selectedCouponId.value || null
     })
     
     // 携带生成的订单 ID 跳转至支付页
@@ -210,6 +227,18 @@ const goPay = async () => {
                 <button @click="goPay" class="h-14 flex-1 rounded-2xl bg-black text-white font-semibold flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-xl shadow-black/10">
                    立即支付 <CreditCard :size="18" stroke-width="1.5" />
                 </button>
+             </div>
+
+             <div v-if="userStore.isLoggedIn" class="pt-4">
+                <p class="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">优惠券（可选）</p>
+                <select
+                  v-model="selectedCouponId"
+                  class="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-black transition-colors bg-white"
+                >
+                  <option :value="null">不使用优惠券</option>
+                  <option v-for="c in myCoupons" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
+                <p v-if="selectedCoupon" class="text-[10px] text-gray-400 mt-2">已选：{{ selectedCoupon.name }}</p>
              </div>
           </div>
        </div>

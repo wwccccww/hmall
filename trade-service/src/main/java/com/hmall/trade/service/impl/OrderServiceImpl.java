@@ -3,8 +3,13 @@ package com.hmall.trade.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.api.client.CartClient;
 import com.hmall.api.client.ItemClient;
+import com.hmall.api.client.PromotionClient;
 import com.hmall.api.dto.ItemDTO;
 import com.hmall.api.dto.OrderDetailDTO;
+import com.hmall.api.dto.promotion.CouponItemDTO;
+import com.hmall.api.dto.promotion.CouponPreviewRequest;
+import com.hmall.api.dto.promotion.CouponPreviewVO;
+import com.hmall.api.dto.promotion.CouponRedeemRequest;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.utils.UserContext;
 import com.hmall.trade.domain.dto.OrderFormDTO;
@@ -38,6 +43,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final ItemClient itemClient;
     private final IOrderDetailService detailService;
     private final CartClient cartClient;
+    private final PromotionClient promotionClient;
 
     @Override
     @GlobalTransactional
@@ -62,6 +68,29 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             total += item.getPrice()  * itemNumMap.getOrDefault(item.getId(),0);
         }
         order.setTotalFee(total);
+        order.setDiscountFee(0);
+        order.setPayFee(total);
+        order.setCouponId(orderFormDTO.getCouponId());
+
+        // 1.4.1 若选择了优惠券，调用 promotion-service 试算优惠并写入订单
+        if (orderFormDTO.getCouponId() != null) {
+            CouponPreviewRequest req = new CouponPreviewRequest();
+            req.setCouponId(orderFormDTO.getCouponId());
+            List<CouponItemDTO> couponItems = items.stream().map(it -> {
+                CouponItemDTO ci = new CouponItemDTO();
+                ci.setItemId(it.getId());
+                ci.setPrice(it.getPrice());
+                ci.setNum(itemNumMap.getOrDefault(it.getId(), 0));
+                ci.setCategory(it.getCategory());
+                return ci;
+            }).collect(Collectors.toList());
+            req.setItems(couponItems);
+            CouponPreviewVO preview = promotionClient.previewCoupon(req);
+            if (preview != null) {
+                order.setDiscountFee(preview.getDiscountAmount());
+                order.setPayFee(preview.getPayAmount());
+            }
+        }
         // 1.5.其它属性
         order.setPaymentType(orderFormDTO.getPaymentType());
         order.setUserId(UserContext.getUser());
@@ -104,6 +133,31 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // 2.修改订单状态
         order.setStatus(2); // 已支付
         updateById(order);
+
+        // 2.1 支付成功后核销用券
+        if (order.getCouponId() != null) {
+            List<OrderDetail> detailsForRedeem = detailService.lambdaQuery().eq(OrderDetail::getOrderId, orderId).list();
+            if (detailsForRedeem != null && !detailsForRedeem.isEmpty()) {
+                Set<Long> itemIdsForRedeem = detailsForRedeem.stream().map(OrderDetail::getItemId).collect(Collectors.toSet());
+                List<ItemDTO> itemInfos = itemClient.queryItemByIds(itemIdsForRedeem);
+                Map<Long, String> categoryMap = itemInfos == null ? Map.of() : itemInfos.stream()
+                        .collect(Collectors.toMap(ItemDTO::getId, ItemDTO::getCategory, (a, b) -> a));
+                CouponRedeemRequest redeem = new CouponRedeemRequest();
+                redeem.setCouponId(order.getCouponId());
+                redeem.setOrderId(orderId);
+                redeem.setUserId(order.getUserId());
+                List<CouponItemDTO> couponItems = detailsForRedeem.stream().map(d -> {
+                    CouponItemDTO ci = new CouponItemDTO();
+                    ci.setItemId(d.getItemId());
+                    ci.setNum(d.getNum());
+                    ci.setPrice(d.getPrice());
+                    ci.setCategory(categoryMap.getOrDefault(d.getItemId(), ""));
+                    return ci;
+                }).collect(Collectors.toList());
+                redeem.setItems(couponItems);
+                promotionClient.redeemCoupon(redeem);
+            }
+        }
 
         // 3.清理购物车
         // 3.1.根据订单id查询订单详情，获取商品id集合

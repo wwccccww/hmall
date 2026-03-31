@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.hmall.item.domain.dto.ItemDTO;
 import com.hmall.item.domain.dto.OrderDetailDTO;
 import com.hmall.item.domain.po.Item;
+import com.hmall.item.domain.vo.CategoryVO;
 
 
 import java.util.Collection;
@@ -19,6 +20,9 @@ public interface IItemService extends IService<Item> {
     void deductStock(List<OrderDetailDTO> items);
 
     List<ItemDTO> queryItemByIds(Collection<Long> ids);
+
+    /** 查询商品表中出现过的类目列表（用于运营端配置指定类目券） */
+    List<CategoryVO> queryCategories();
 
     /**
      * 查询商品详情（带 Redis 缓存）。

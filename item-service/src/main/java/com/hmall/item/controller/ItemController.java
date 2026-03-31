@@ -8,6 +8,7 @@ import com.hmall.common.utils.BeanUtils;
 import com.hmall.item.domain.dto.ItemDTO;
 import com.hmall.item.domain.dto.OrderDetailDTO;
 import com.hmall.item.domain.po.Item;
+import com.hmall.item.domain.vo.CategoryVO;
 import com.hmall.item.service.IItemService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -43,6 +44,12 @@ public class ItemController {
     @GetMapping("{id}")
     public ItemDTO queryItemById(@PathVariable("id") Long id) {
         return itemService.queryItemById(id);
+    }
+
+    @ApiOperation("查询商品类目列表（去重，用于运营端配置指定类目券）")
+    @GetMapping("/categories")
+    public List<CategoryVO> queryCategories() {
+        return itemService.queryCategories();
     }
 
     @ApiOperation("新增商品")

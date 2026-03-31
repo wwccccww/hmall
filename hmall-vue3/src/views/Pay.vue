@@ -25,7 +25,8 @@ onMounted(async () => {
       const order = Array.isArray(res) ? res[0] : res
       if (order) {
         // 兼容蛇形命名和驼峰命名
-        const finalFee = order.totalFee || order.total_fee || 0;
+        const finalFee =
+          order.payFee || order.pay_fee || order.totalFee || order.total_fee || 0;
         const finalOrderId = order.id || order.id_ || orderId.value;
         
         if (finalFee) {

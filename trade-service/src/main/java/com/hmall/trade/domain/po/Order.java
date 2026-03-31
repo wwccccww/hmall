@@ -34,6 +34,15 @@ public class Order implements Serializable {
      */
     private Integer totalFee;
 
+    /** 优惠券ID（不使用则为空） */
+    private Long couponId;
+
+    /** 优惠金额（分） */
+    private Integer discountFee;
+
+    /** 应付金额（分） */
+    private Integer payFee;
+
     /**
      * 支付类型，1、支付宝，2、微信，3、扣减余额
      */

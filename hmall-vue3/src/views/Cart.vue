@@ -3,12 +3,19 @@ import { ref, computed, onMounted } from 'vue'
 import { ShoppingBag, ChevronLeft, Trash2, ArrowRight, Minus, Plus, MapPin, CheckCircle2, Circle } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { getCarts, getAddresses, updateCartItem, deleteCartItem, createOrder } from '@/api'
+import { getAvailableCouponsForCart } from '@/api/coupon'
 
 const router = useRouter()
 
 const cartItems = ref([])
 const addresses = ref([])
 const selectedAddressId = ref(null)
+const myCoupons = ref([])
+const selectedCouponId = ref(null)
+
+const selectedCoupon = computed(() =>
+  myCoupons.value.find(c => String(c.id) === String(selectedCouponId.value)) || null
+)
 
 onMounted(async () => {
   // 获取购物车
@@ -47,7 +54,41 @@ onMounted(async () => {
     addresses.value = [{ id: 1, contact: '测试用户', mobile: '13800000000', province: '广东省', city: '深圳市', town: '南山区', street: '腾讯大厦', isDefault: true }]
     selectedAddressId.value = 1
   }
+
+  await refreshCoupons()
 })
+
+const buildCouponItems = (selectedItems) => selectedItems.map(i => ({
+  itemId: i.itemId || i.id,
+  price: Math.round(Number(i.price) * 100),
+  num: i.quantity,
+  category: i.category || '',
+  brand: i.brand || '',
+  shopId: i.shopId || null
+}))
+
+const refreshCoupons = async () => {
+  const selectedItems = cartItems.value.filter(i => i.selected)
+  if (selectedItems.length === 0) {
+    myCoupons.value = []
+    selectedCouponId.value = null
+    return
+  }
+  try {
+    const res = await getAvailableCouponsForCart(
+      { items: buildCouponItems(selectedItems) },
+      { silentError: true }
+    )
+    myCoupons.value = Array.isArray(res) ? res : []
+    // 若当前选中的券不在可用列表里，清空选择
+    if (selectedCouponId.value && !myCoupons.value.some(c => String(c.id) === String(selectedCouponId.value))) {
+      selectedCouponId.value = null
+    }
+  } catch {
+    myCoupons.value = []
+    selectedCouponId.value = null
+  }
+}
 
 const total = computed(() => {
   return cartItems.value
@@ -108,7 +149,8 @@ const checkout = async () => {
     const orderId = await createOrder({
       details,
       paymentType: 3,
-      addressId: selectedAddressId.value
+      addressId: selectedAddressId.value,
+      couponId: selectedCouponId.value || null
     })
     console.log("收到的订单id是: " , orderId)
     router.push({ path: '/pay', query: { id: orderId } })
@@ -226,6 +268,30 @@ const checkout = async () => {
         <div class="lg:col-span-1">
           <div class="bg-gray-50/50 p-8 rounded-3xl space-y-8 sticky top-32 border border-gray-100">
              <h2 class="text-xl font-semibold tracking-tight">订单总计</h2>
+
+             <!-- 优惠券选择 -->
+             <div class="space-y-2">
+                <p class="text-[11px] font-bold uppercase tracking-widest text-gray-400">优惠券</p>
+                <select
+                  v-model="selectedCouponId"
+                  class="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-black transition-colors bg-white"
+                >
+                  <option :value="null">不使用优惠券</option>
+                  <option v-for="c in myCoupons" :key="c.id" :value="c.id">
+                    {{ c.name }}（立减 ¥{{ ((c.discountAmount || 0) / 100).toFixed(2) }}）
+                  </option>
+                </select>
+                <p v-if="selectedCoupon" class="text-[10px] text-gray-400">
+                  已选：{{ selectedCoupon.name }}
+                </p>
+                <button
+                  type="button"
+                  @click="refreshCoupons"
+                  class="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black"
+                >
+                  刷新可用优惠券
+                </button>
+             </div>
              
              <div class="space-y-4 text-sm border-b border-gray-200 pb-6">
                 <div class="flex justify-between text-gray-600">
