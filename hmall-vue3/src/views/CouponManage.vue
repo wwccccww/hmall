@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Plus, Send, Ticket, BadgePercent, RefreshCw, CheckCircle2 } from 'lucide-vue-next'
-import { createCoupon, publishCoupon, getManageCoupons } from '@/api/coupon'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { Plus, Send, Ticket, BadgePercent, RefreshCw, CheckCircle2, Clock, Users } from 'lucide-vue-next'
+import { createCoupon, publishCoupon, getManageCoupons, getCouponReceiveRecords } from '@/api/coupon'
 import { showApiErrorAlert } from '@/utils/apiError'
 
 // ============================================================
@@ -10,6 +10,47 @@ import { showApiErrorAlert } from '@/utils/apiError'
 const submitting = ref(false)
 const publishingId = ref(null)
 const coupons = ref([])
+
+/** 展开某券的领取记录面板 */
+const recordsOpenId = ref(null)
+const recordsPayload = ref({ list: [], total: 0, pages: 0 })
+const recordsLoading = ref(false)
+
+const recordStatusLabel = (s) => {
+  const map = { 1: '未使用', 2: '已使用', 3: '已过期' }
+  return map[s] ?? `状态${s}`
+}
+
+const toggleReceiveRecords = async (coupon) => {
+  if (recordsOpenId.value === coupon.id) {
+    recordsOpenId.value = null
+    return
+  }
+  recordsOpenId.value = coupon.id
+  recordsLoading.value = true
+  recordsPayload.value = { list: [], total: 0, pages: 0 }
+  try {
+    const res = await getCouponReceiveRecords(coupon.id, {
+      params: { pageNo: 1, pageSize: 50 },
+      silentError: true
+    })
+    recordsPayload.value = {
+      list: Array.isArray(res?.list) ? res.list : [],
+      total: res?.total ?? 0,
+      pages: res?.pages ?? 0
+    }
+  } catch (e) {
+    showApiErrorAlert(e)
+    recordsOpenId.value = null
+  } finally {
+    recordsLoading.value = false
+  }
+}
+
+/** 每秒更新一次（用于动态判断是否过期） */
+const now = ref(new Date())
+let clockTimer = null
+let pollTimer = null
 
 const form = ref({
   name: '',
@@ -26,13 +67,62 @@ const resetForm = () => {
 }
 
 // ============================================================
-// 格式转换：datetime-local 值 → ISO 字符串（LocalDateTime 接受 yyyy-MM-ddTHH:mm:ss）
+// 格式转换
 // ============================================================
 const toISOLocal = (datetimeLocal) =>
-  datetimeLocal ? datetimeLocal.replace('T', 'T') + ':00' : null
+  datetimeLocal ? datetimeLocal + ':00' : null
+
+const pad = n => String(n).padStart(2, '0')
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
 
 // ============================================================
-// 加载已发布优惠券
+// 动态有效状态
+// 规则：DB status=2（进行中）但 endTime 已过 → 显示为"已结束"
+//       DB status=2 但 beginTime 未到 → 显示为"未开始"
+// ============================================================
+const effectiveStatus = (coupon) => {
+  if (coupon.status !== 2) return coupon.status
+  const begin = new Date(coupon.beginTime)
+  const end   = new Date(coupon.endTime)
+  if (now.value < begin) return 5  // 未开始（扩展状态码，仅前端使用）
+  if (now.value >= end)  return 3  // 已结束
+  return 2                         // 进行中
+}
+
+const statusLabel = (coupon) => {
+  const s = effectiveStatus(coupon)
+  const map = { 1: '草稿', 2: '进行中', 3: '已结束', 4: '暂停', 5: '未开始' }
+  return map[s] || '未知'
+}
+
+const statusClass = (coupon) => {
+  const s = effectiveStatus(coupon)
+  if (s === 2) return 'bg-emerald-50 text-emerald-700'
+  if (s === 1) return 'bg-gray-100 text-gray-500'
+  if (s === 5) return 'bg-blue-50 text-blue-600'
+  return 'bg-red-50 text-red-500'
+}
+
+/** 倒计时（距结束）：进行中的券才显示 */
+const getCountdown = (coupon) => {
+  if (effectiveStatus(coupon) !== 2) return null
+  const diff = new Date(coupon.endTime) - now.value
+  if (diff <= 0) return null
+  const s = Math.floor(diff / 1000) % 60
+  const m = Math.floor(diff / 60_000) % 60
+  const h = Math.floor(diff / 3_600_000) % 24
+  const d = Math.floor(diff / 86_400_000)
+  if (d > 0) return `还剩 ${d}天 ${pad(h)}:${pad(m)}:${pad(s)}`
+  return `还剩 ${pad(h)}:${pad(m)}:${pad(s)}`
+}
+
+// ============================================================
+// 加载已发布优惠券（含 Redis 实时库存，由后端 enrichWithRedisStock 注入）
 // ============================================================
 const loadCoupons = async () => {
   try {
@@ -89,27 +179,22 @@ const handlePublish = async (coupon) => {
   }
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('zh-CN')
-}
+const typeLabel = (type, val) => type === 1 ? `满减 ¥${val / 100}` : `${val}折`
 
-const typeLabel = (type, val) => {
-  return type === 1 ? `满减 ¥${val / 100}` : `${val}折`
-}
+// ============================================================
+// 生命周期
+// ============================================================
+onMounted(() => {
+  clockTimer = setInterval(() => { now.value = new Date() }, 1000)
+  // 每 30 秒重新拉一次（含最新 Redis 库存）
+  pollTimer = setInterval(loadCoupons, 30_000)
+  loadCoupons()
+})
 
-const statusLabel = (status) => {
-  const map = { 1: '草稿', 2: '进行中', 3: '已结束', 4: '暂停' }
-  return map[status] || '未知'
-}
-
-const statusClass = (status) => {
-  if (status === 2) return 'bg-emerald-50 text-emerald-700'
-  if (status === 1) return 'bg-gray-100 text-gray-500'
-  return 'bg-red-50 text-red-500'
-}
-
-onMounted(loadCoupons)
+onUnmounted(() => {
+  clearInterval(clockTimer)
+  clearInterval(pollTimer)
+})
 </script>
 
 <template>
@@ -119,7 +204,7 @@ onMounted(loadCoupons)
     <div class="flex items-center justify-between">
       <div class="space-y-1">
         <h1 class="text-2xl font-bold tracking-tight">优惠券运营</h1>
-        <p class="text-gray-400 text-sm">仅展示当前登录管理员创建的券；创建后发布到 Redis，用户可在领券中心秒杀领取</p>
+        <p class="text-gray-400 text-sm">仅展示当前管理员创建的券；状态与库存实时更新（每 30 秒自动刷新）</p>
       </div>
       <button @click="loadCoupons" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-50 transition-colors">
         <RefreshCw :size="16" stroke-width="1.5" class="text-gray-400" />
@@ -261,31 +346,44 @@ onMounted(loadCoupons)
         <div
           v-for="coupon in coupons"
           :key="coupon.id"
-          class="flex items-center gap-6 px-8 py-5 hover:bg-gray-50/50 transition-colors"
+          class="hover:bg-gray-50/50 transition-colors"
         >
+        <div class="flex items-center gap-6 px-8 py-5">
           <!-- 图标 -->
-          <div class="w-10 h-10 bg-black rounded-xl flex items-center justify-center shrink-0">
-            <BadgePercent v-if="coupon.type === 1" :size="18" class="text-white" />
-            <Ticket v-else :size="18" class="text-white" />
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            :class="effectiveStatus(coupon) === 2 ? 'bg-black' : 'bg-gray-200'">
+            <BadgePercent v-if="coupon.type === 1" :size="18" :class="effectiveStatus(coupon) === 2 ? 'text-white' : 'text-gray-400'" />
+            <Ticket v-else :size="18" :class="effectiveStatus(coupon) === 2 ? 'text-white' : 'text-gray-400'" />
           </div>
 
           <!-- 信息 -->
-          <div class="flex-1 min-w-0 space-y-1">
-            <div class="flex items-center gap-2">
+          <div class="flex-1 min-w-0 space-y-1.5">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="font-semibold text-[14px] truncate">{{ coupon.name }}</span>
-              <span class="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider" :class="statusClass(coupon.status)">
-                {{ statusLabel(coupon.status) }}
+              <span class="shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider" :class="statusClass(coupon)">
+                {{ statusLabel(coupon) }}
               </span>
             </div>
-            <div class="flex items-center gap-4 text-[11px] text-gray-400">
+            <div class="flex items-center gap-4 text-[11px] text-gray-400 flex-wrap">
               <span>{{ typeLabel(coupon.type, coupon.discountValue) }}</span>
-              <span>库存 {{ coupon.stock }}</span>
-              <span>{{ formatDate(coupon.beginTime) }} ~ {{ formatDate(coupon.endTime) }}</span>
+              <!-- Redis 实时库存 -->
+              <span class="font-medium" :class="coupon.stock <= 10 ? 'text-red-500' : coupon.stock <= 50 ? 'text-orange-500' : 'text-gray-500'">
+                剩余库存 {{ coupon.stock }}
+              </span>
+            </div>
+            <!-- 精确到秒的时间 -->
+            <div class="flex items-center gap-1.5 text-[10px] text-gray-300">
+              <Clock :size="10" />
+              {{ formatDateTime(coupon.beginTime) }} ~ {{ formatDateTime(coupon.endTime) }}
+            </div>
+            <!-- 进行中显示实时倒计时 -->
+            <div v-if="getCountdown(coupon)" class="text-[10px] font-mono font-bold text-orange-500">
+              {{ getCountdown(coupon) }}
             </div>
           </div>
 
-          <!-- 发布按钮（已发布时显示"已上线"） -->
-          <div class="shrink-0">
+          <!-- 操作：发布 / 领取记录 -->
+          <div class="shrink-0 flex flex-col items-end gap-2">
             <div v-if="coupon.status === 2" class="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
               <CheckCircle2 :size="14" /> 已上线
             </div>
@@ -298,7 +396,50 @@ onMounted(loadCoupons)
               <Send :size="12" />
               {{ publishingId === coupon.id ? '发布中…' : '发布上线' }}
             </button>
+            <button
+              type="button"
+              @click="toggleReceiveRecords(coupon)"
+              class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 hover:text-black"
+            >
+              <Users :size="12" />
+              {{ recordsOpenId === coupon.id ? '收起领取记录' : '领取记录' }}
+            </button>
           </div>
+        </div>
+
+        <!-- 领取记录（user_coupon） -->
+        <div
+          v-if="recordsOpenId === coupon.id"
+          class="px-8 pb-6 border-t border-gray-50 bg-gray-50/40"
+        >
+          <p v-if="recordsLoading" class="text-xs text-gray-400 py-3">加载中…</p>
+          <template v-else>
+            <p v-if="recordsPayload.list.length === 0" class="text-xs text-gray-400 py-3">暂无领取记录</p>
+            <div v-else class="overflow-x-auto rounded-xl border border-gray-100 bg-white">
+              <table class="min-w-full text-left text-[11px]">
+                <thead class="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider">
+                  <tr>
+                    <th class="px-4 py-2">用户 ID</th>
+                    <th class="px-4 py-2">领取时间</th>
+                    <th class="px-4 py-2">状态</th>
+                    <th class="px-4 py-2">过期时间</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                  <tr v-for="(row, idx) in recordsPayload.list" :key="idx">
+                    <td class="px-4 py-2 font-mono">{{ row.userId }}</td>
+                    <td class="px-4 py-2">{{ formatDateTime(row.receiveTime) }}</td>
+                    <td class="px-4 py-2">{{ recordStatusLabel(row.status) }}</td>
+                    <td class="px-4 py-2">{{ formatDateTime(row.expiredAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-if="recordsPayload.total > recordsPayload.list.length" class="px-4 py-2 text-[10px] text-gray-400">
+                共 {{ recordsPayload.total }} 条，当前展示前 {{ recordsPayload.list.length }} 条
+              </p>
+            </div>
+          </template>
+        </div>
         </div>
       </div>
     </div>

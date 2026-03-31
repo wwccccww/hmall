@@ -1,6 +1,9 @@
 package com.hmall.promotion.controller;
 
+import com.hmall.common.domain.PageDTO;
+import com.hmall.common.domain.PageQuery;
 import com.hmall.promotion.domain.dto.CouponFormDTO;
+import com.hmall.promotion.domain.vo.CouponReceiveRecordVO;
 import com.hmall.promotion.domain.vo.CouponVO;
 import com.hmall.promotion.service.ICouponService;
 import io.swagger.annotations.Api;
@@ -10,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @Api(tags = "优惠券相关接口")
 @RestController
@@ -43,6 +47,14 @@ public class CouponController {
         return couponService.queryManageCoupons();
     }
 
+    @ApiOperation("管理端：分页查询某张券的领取记录（user_coupon，仅创建者可查）")
+    @GetMapping("/{id}/records")
+    public PageDTO<CouponReceiveRecordVO> queryCouponReceiveRecords(
+            @PathVariable("id") Long id,
+            PageQuery pageQuery) {
+        return couponService.queryCouponReceiveRecords(id, pageQuery);
+    }
+
     @ApiOperation("用户抢券（秒杀）：Lua 原子扣减 Redis 库存，成功后异步落库")
     @PostMapping("/{id}/receive")
     public void receiveCoupon(@PathVariable("id") Long id) {
@@ -53,5 +65,11 @@ public class CouponController {
     @GetMapping("/my")
     public List<CouponVO> queryMyCoupons() {
         return couponService.queryMyCoupons();
+    }
+
+    @ApiOperation("批量获取券的 Redis 实时剩余库存（前端实时轮询）")
+    @GetMapping("/stock")
+    public Map<Long, Integer> getRealtimeStock(@RequestParam("ids") List<Long> ids) {
+        return couponService.getRealtimeStock(ids);
     }
 }

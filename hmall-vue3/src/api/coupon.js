@@ -8,6 +8,14 @@ export const getAvailableCoupons = (extraConfig = {}) =>
 export const getManageCoupons = (extraConfig = {}) =>
   request.get('/coupons/manage', extraConfig)
 
+/**
+ * 管理端：分页查询某张券的领取记录（user_coupon）
+ * @param {number} id 优惠券 ID
+ * @param {object} [extraConfig] axios 配置，可传 params: { pageNo, pageSize }
+ */
+export const getCouponReceiveRecords = (id, extraConfig = {}) =>
+  request.get(`/coupons/${id}/records`, extraConfig)
+
 /** 查询当前登录用户的领券记录（需登录） */
 export const getMyCoupons = (extraConfig = {}) =>
   request.get('/coupons/my', extraConfig)
@@ -23,3 +31,11 @@ export const createCoupon = (data, extraConfig = {}) =>
 /** 管理端：发布优惠券（将库存同步到 Redis）；可传 { silentError: true } */
 export const publishCoupon = (id, extraConfig = {}) =>
   request.put(`/coupons/${id}/publish`, null, extraConfig)
+
+/**
+ * 批量获取券的 Redis 实时剩余库存（公开，无需登录）
+ * @param {number[]} ids 优惠券 ID 数组
+ * @returns {Promise<Record<number, number>>} couponId → 剩余库存
+ */
+export const getRealtimeStock = (ids, extraConfig = {}) =>
+  request.get('/coupons/stock', { params: { ids: ids.join(',') }, ...extraConfig })

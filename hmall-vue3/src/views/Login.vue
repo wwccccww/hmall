@@ -129,8 +129,8 @@ const handleLogin = async () => {
               <input 
                 v-model="loginForm.password"
                 :type="showPassword ? 'text' : 'password'" 
-                placeholder="   请输入密码"
-                class="spa-input pl-11 pr-11"
+                placeholder="  请输入密码"
+                class="spa-input pl-13 pr-11"
                 @focus="isFocused = 'password'"
                 @blur="isFocused = null"
                 required
@@ -187,6 +187,22 @@ const handleLogin = async () => {
 </template>
 
 <style scoped>
+/* 核心修复：强制给左侧留出 3rem (48px) 的空间 */
+.spa-input {
+  padding-left: 3rem !important; 
+  padding-right: 3rem !important; /* 给右侧的小眼睛图标也留点空间 */
+}
+
+/* 确保图标位置在 padding 区域内居中 */
+.relative.group .absolute.left-4 {
+  left: 1rem; /* 图标距离左边缘 16px */
+}
+
+/* 修正 placeholder 的样式，确保它也不会和图标重叠 */
+.spa-input::placeholder {
+  color: #9CA3AF;
+  font-size: 0.875rem;
+}
 /* Scoped overrides if needed, but primary styles in style.css */
 </style>
 

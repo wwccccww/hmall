@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `user_coupon` (
     `create_time`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `update_time`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_coupon` (`user_id`, `coupon_id`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_coupon_id` (`coupon_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户领券记录表（由MQ消费者异步写入）';

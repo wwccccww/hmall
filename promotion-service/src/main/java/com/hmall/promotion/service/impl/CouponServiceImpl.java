@@ -1,7 +1,10 @@
 package com.hmall.promotion.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmall.common.domain.PageDTO;
+import com.hmall.common.domain.PageQuery;
 import com.hmall.common.exception.BizIllegalException;
 import com.hmall.common.exception.UnauthorizedException;
 import com.hmall.common.utils.BeanUtils;
@@ -9,6 +12,7 @@ import com.hmall.common.utils.UserContext;
 import com.hmall.promotion.domain.dto.CouponFormDTO;
 import com.hmall.promotion.domain.po.Coupon;
 import com.hmall.promotion.domain.po.UserCoupon;
+import com.hmall.promotion.domain.vo.CouponReceiveRecordVO;
 import com.hmall.promotion.domain.vo.CouponVO;
 import com.hmall.promotion.mapper.CouponMapper;
 import com.hmall.promotion.mq.CouponReceiveMessage;
@@ -22,7 +26,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -167,11 +174,32 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     }
 
     @Override
+    public PageDTO<CouponReceiveRecordVO> queryCouponReceiveRecords(Long couponId, PageQuery pageQuery) {
+        Long creatorId = UserContext.getUser();
+        if (creatorId == null) {
+            throw new UnauthorizedException("请先登录");
+        }
+        Coupon coupon = getById(couponId);
+        if (coupon == null) {
+            throw new BizIllegalException("优惠券不存在");
+        }
+        if (coupon.getCreatorId() != null && !coupon.getCreatorId().equals(creatorId)) {
+            throw new BizIllegalException("无权查看他人创建的优惠券领取记录");
+        }
+        Page<UserCoupon> page = userCouponService.lambdaQuery()
+                .eq(UserCoupon::getCouponId, couponId)
+                .page(pageQuery.toMpPage("receive_time", false));
+        return PageDTO.of(page, CouponReceiveRecordVO.class);
+    }
+
+    @Override
     public List<CouponVO> queryAvailableCoupons() {
         List<Coupon> coupons = lambdaQuery()
                 .eq(Coupon::getStatus, 2)
                 .list();
-        return BeanUtils.copyList(coupons, CouponVO.class);
+        List<CouponVO> vos = BeanUtils.copyList(coupons, CouponVO.class);
+        enrichWithRedisStock(vos);
+        return vos;
     }
 
     @Override
@@ -184,6 +212,48 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
                 Wrappers.<Coupon>lambdaQuery()
                         .eq(Coupon::getCreatorId, creatorId)
                         .orderByDesc(Coupon::getCreateTime));
-        return BeanUtils.copyList(coupons, CouponVO.class);
+        List<CouponVO> vos = BeanUtils.copyList(coupons, CouponVO.class);
+        enrichWithRedisStock(vos);
+        return vos;
+    }
+
+    @Override
+    public Map<Long, Integer> getRealtimeStock(List<Long> ids) {
+        Map<Long, Integer> result = new LinkedHashMap<>();
+        for (Long id : ids) {
+            String s = redisTemplate.opsForValue().get(COUPON_STOCK_KEY + id);
+            result.put(id, s != null ? safeParseInt(s) : 0);
+        }
+        return result;
+    }
+
+    @Override
+    public void autoExpireCoupons() {
+        List<Coupon> expired = lambdaQuery()
+                .eq(Coupon::getStatus, 2)
+                .lt(Coupon::getEndTime, LocalDateTime.now())
+                .list();
+        if (expired.isEmpty()) return;
+        List<Long> ids = expired.stream().map(Coupon::getId).collect(Collectors.toList());
+        update(Wrappers.<Coupon>lambdaUpdate()
+                .set(Coupon::getStatus, 3)
+                .in(Coupon::getId, ids));
+        log.info("自动将 {} 张优惠券置为已结束: {}", ids.size(), ids);
+    }
+
+    // ======================== 私有工具 ========================
+
+    /** 从 Redis 读取实时库存并回写到 CouponVO 列表（已发布的券才有 Redis key） */
+    private void enrichWithRedisStock(List<CouponVO> vos) {
+        for (CouponVO vo : vos) {
+            String s = redisTemplate.opsForValue().get(COUPON_STOCK_KEY + vo.getId());
+            if (s != null) {
+                vo.setStock(safeParseInt(s));
+            }
+        }
+    }
+
+    private int safeParseInt(String s) {
+        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 0; }
     }
 }

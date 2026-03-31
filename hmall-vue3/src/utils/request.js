@@ -20,17 +20,18 @@ function isAdminBackendPath(path) {
   return path === '/admin' || path.startsWith('/admin/')
 }
 
-/** 401：确认后前往登录页（管理端 → /admin-login，商城 → /login） */
-function confirmRedirectToLogin() {
+/** 并发 401 只处理一次，避免多次 alert/跳转 */
+let redirectingToLogin = false
+
+/** 401：alert 点确定后必跳登录页（管理端 → /admin-login，商城 → /login） */
+function alertRedirectToLogin() {
+  if (redirectingToLogin) return
+  redirectingToLogin = true
   const path = window.location.pathname || ''
   const loginPath = isAdminBackendPath(path) ? '/admin-login' : '/login'
   const back = path + (window.location.search || '')
-  const ok = window.confirm('登录已失效，是否前往登录页？')
-  if (ok) {
-    window.location.assign(
-      loginPath + '?redirect=' + encodeURIComponent(back || '/')
-    )
-  }
+  window.alert('登录已失效，请重新登录')
+  window.location.assign(loginPath + '?redirect=' + encodeURIComponent(back || '/'))
 }
 
 const request = axios.create({
@@ -70,9 +71,10 @@ request.interceptors.response.use(
     const isLoginRequest = url.includes('/users/login')
     const silent = err.config?.silentError === true
 
-    if (status === 401 && !isLoginRequest && !silent) {
+    // 401 不受 silentError 影响：必须清理登录态并提示后跳转
+    if (status === 401 && !isLoginRequest) {
       clearAuthState()
-      confirmRedirectToLogin()
+      alertRedirectToLogin()
       return Promise.reject(err)
     }
 

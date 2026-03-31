@@ -11,6 +11,7 @@
         <module name="pay-service" />
         <module name="hm-gateway" />
         <module name="hm-common" />
+        <module name="promotion-service" />
         <module name="item-service" />
         <module name="user-service" />
         <module name="hm-api" />
@@ -32,6 +33,7 @@
       <module name="hm-trade" options="-parameters" />
       <module name="item-service" options="-parameters" />
       <module name="pay-service" options="-parameters" />
+      <module name="promotion-service" options="-parameters" />
       <module name="trade-service" options="-parameters" />
       <module name="user-service" options="-parameters" />
     </option>

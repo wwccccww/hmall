@@ -76,13 +76,17 @@ public class AuthGlobalFilter implements GlobalFilter , Ordered {
         return false;
     }
 
-    /** 仅 GET 且路径为 /coupons（无子路径）时公开，与「排除整个 /coupons」不同，避免 POST 创建券无 user-info */
+    /**
+     * 公开 GET 接口白名单：
+     *  - GET /coupons        公开券列表（无需登录）
+     *  - GET /coupons/stock  实时库存查询（前端轮询，同样无需登录）
+     */
     private boolean isPublicCouponListGet(ServerHttpRequest request) {
         if (!"GET".equalsIgnoreCase(request.getMethod().name())) {
             return false;
         }
         String path = request.getPath().value();
-        return "/coupons".equals(path);
+        return "/coupons".equals(path) || "/coupons/stock".equals(path);
     }
 
     @Override

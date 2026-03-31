@@ -1,11 +1,15 @@
 package com.hmall.promotion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.hmall.common.domain.PageDTO;
+import com.hmall.common.domain.PageQuery;
 import com.hmall.promotion.domain.dto.CouponFormDTO;
 import com.hmall.promotion.domain.po.Coupon;
 import com.hmall.promotion.domain.vo.CouponVO;
+import com.hmall.promotion.domain.vo.CouponReceiveRecordVO;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ICouponService extends IService<Coupon> {
 
@@ -37,9 +41,21 @@ public interface ICouponService extends IService<Coupon> {
     /** 查询当前用户的全部领券记录 */
     List<CouponVO> queryMyCoupons();
 
+    /** 管理端：分页查询某张券的领取记录（user_coupon） */
+    PageDTO<CouponReceiveRecordVO> queryCouponReceiveRecords(Long couponId, PageQuery pageQuery);
+
     /** 查询所有进行中的优惠券列表（C 端领券中心，展示全平台已发布券） */
     List<CouponVO> queryAvailableCoupons();
 
     /** 管理端：当前登录管理员创建的优惠券（含草稿/进行中/结束等全部状态） */
     List<CouponVO> queryManageCoupons();
+
+    /**
+     * 从 Redis 获取多张券的实时剩余库存。
+     * 若 Redis key 不存在（券未发布或已清除），返回值为 0。
+     */
+    Map<Long, Integer> getRealtimeStock(List<Long> ids);
+
+    /** 定时任务：把活动已结束但状态仍为进行中(2)的券自动置为已结束(3) */
+    void autoExpireCoupons();
 }
