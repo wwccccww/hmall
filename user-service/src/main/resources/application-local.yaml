@@ -2,6 +2,12 @@ hm:
   db:
     host: 192.168.116.130  # 修改为你自己的虚拟机IP地址
     pw: 123 # 修改为docker中的MySQL密码
+  # Nacos shared-swagger.yaml 里 knife4j.openapi 使用了 ${hm.swagger.title}、${hm.swagger.package} 等占位符。
+  # 若不按微服务覆盖，会一直显示默认「黑马商城」且 package 可能指向其它服务，导致 doc.html 无接口分组。
+  swagger:
+    title: 用户服务接口文档
+    description: "用户与收货地址；直连调试请在 Knife4j Authorize 填写 user-info（登录返回的 userId）"
+    package: com.hmall.user.controller
 
 spring:
   cloud:

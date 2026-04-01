@@ -40,11 +40,26 @@ logging:
     dateformat: HH:mm:ss:SSS
   file:
     path: "logs/${spring.application.name}"
+
+# springdoc：显式扫描 Controller，避免与 Nacos 等配置组合时出现文档为空
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+  packages-to-scan: com.hmall.user.controller
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+
+# 标题/分组包名以 Nacos shared-swagger 为准时，依赖占位符 ${hm.swagger.*}，请在各环境 yaml（如 application-local）中按微服务设置 hm.swagger
 knife4j:
   enable: true
+  setting:
+    language: zh_cn
+    enable-swagger-models: true
   openapi:
-    title: 黑马商城接口文档
-    description: "黑马商城接口文档"
+    title: 用户服务接口文档
+    description: "hmall 用户与地址；调试说明见 OpenAPI info 与 Authorize（user-info）"
     email: zhanghuyi@itcast.cn
     concat: 虎哥
     url: https://www.itcast.cn

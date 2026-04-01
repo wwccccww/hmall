@@ -4,6 +4,7 @@ import com.hmall.common.domain.R;
 import com.hmall.common.exception.BadRequestException;
 import com.hmall.common.exception.CommonException;
 import com.hmall.common.exception.DbException;
+import com.hmall.common.exception.TooManyRequestsException;
 import com.hmall.common.utils.WebUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,12 @@ public class CommonExceptionAdvice {
     @ExceptionHandler(DbException.class)
     public Object handleDbException(DbException e) {
         log.error("mysql数据库操作异常 -> ", e);
+        return processResponse(e);
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public Object handleTooManyRequestsException(TooManyRequestsException e) {
+        log.warn("请求过于频繁 -> {}", e.getMessage());
         return processResponse(e);
     }
 

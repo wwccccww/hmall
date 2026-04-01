@@ -8,6 +8,7 @@ import com.hmall.common.utils.UserContext;
 
 import com.hmall.user.domain.dto.AddressDTO;
 import com.hmall.user.domain.po.Address;
+import com.hmall.user.config.UserOpenApiConfiguration;
 import com.hmall.user.service.IAddressService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.util.List;
 
@@ -29,10 +32,12 @@ import java.util.List;
 @RequestMapping("/addresses")
 @RequiredArgsConstructor
 @Api(tags = "收货地址管理接口")
+@SecurityRequirement(name = UserOpenApiConfiguration.USER_INFO_SCHEME)
 public class AddressController {
 
     private final IAddressService addressService;
 
+    @Operation(summary = "根据 id 查询地址", description = "地址须属于 user-info 对应用户")
     @ApiOperation("根据id查询地址")
     @GetMapping("{addressId}")
     public AddressDTO findAddressById(@ApiParam("地址id") @PathVariable("addressId") Long id) {
@@ -45,6 +50,7 @@ public class AddressController {
         }
         return BeanUtils.copyBean(address, AddressDTO.class);
     }
+    @Operation(summary = "查询当前用户地址列表")
     @ApiOperation("查询当前用户地址列表")
     @GetMapping
     public List<AddressDTO> findMyAddresses() {

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmall.common.domain.PageDTO;
 import com.hmall.common.domain.PageQuery;
 import com.hmall.common.exception.BizIllegalException;
+import com.hmall.common.exception.TooManyRequestsException;
 import com.hmall.common.exception.UnauthorizedException;
 import com.hmall.common.utils.BeanUtils;
 import com.hmall.common.utils.UserContext;
@@ -29,6 +30,7 @@ import com.hmall.promotion.mapper.CouponCategoryMapper;
 import com.hmall.promotion.mapper.CouponMapper;
 import com.hmall.promotion.mapper.CouponShopMapper;
 import com.hmall.promotion.mq.CouponReceiveMessage;
+import com.hmall.promotion.config.SeckillReceiveRateLimitProperties;
 import com.hmall.promotion.service.ICouponService;
 import com.hmall.promotion.service.IUserCouponService;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -83,11 +85,15 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
 
     /** 预加载 Lua 脚本（只加载一次，带 SHA 缓存） */
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
+    private static final DefaultRedisScript<Long> RECEIVE_TOKEN_BUCKET_SCRIPT;
 
     static {
         SECKILL_SCRIPT = new DefaultRedisScript<>();
         SECKILL_SCRIPT.setLocation(new ClassPathResource("scripts/seckill.lua"));
         SECKILL_SCRIPT.setResultType(Long.class);
+        RECEIVE_TOKEN_BUCKET_SCRIPT = new DefaultRedisScript<>();
+        RECEIVE_TOKEN_BUCKET_SCRIPT.setLocation(new ClassPathResource("scripts/token_bucket.lua"));
+        RECEIVE_TOKEN_BUCKET_SCRIPT.setResultType(Long.class);
     }
 
     private final StringRedisTemplate redisTemplate;
@@ -96,6 +102,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
     private final CouponCategoryMapper couponCategoryMapper;
     private final CouponBrandMapper couponBrandMapper;
     private final CouponShopMapper couponShopMapper;
+    private final SeckillReceiveRateLimitProperties seckillReceiveRateLimitProperties;
 
     /**
      * 秒杀抢券元数据本地缓存（单实例）：用于快速拒绝“活动未开始/已结束/未发布/不存在”等失败请求，减少 DB 压力。
@@ -296,6 +303,20 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         LocalDateTime now = LocalDateTime.now();
         if (!meta.isActive(now)) {
             throw new BizIllegalException("优惠券不存在或活动未开始");
+        }
+
+        // 1.1 服务侧令牌桶：按 userId + couponId 限流（在秒杀 Lua 之前快速拒绝刷接口）
+        if (seckillReceiveRateLimitProperties.isEnabled()) {
+            String rlKey = "promotion:ratelimit:receive:" + couponId + ":" + userId;
+            Long allowed = redisTemplate.execute(
+                    RECEIVE_TOKEN_BUCKET_SCRIPT,
+                    List.of(rlKey),
+                    String.valueOf(seckillReceiveRateLimitProperties.getReplenishPerSecond()),
+                    String.valueOf(seckillReceiveRateLimitProperties.getBurst())
+            );
+            if (allowed == null || allowed == 0L) {
+                throw new TooManyRequestsException("请求过于频繁，请稍后再试");
+            }
         }
 
         // 2. 执行 Lua 脚本：原子判断库存 + 用户去重 + 扣减
@@ -571,6 +592,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
             this.endTime = endTime;
         }
 
+        // 判断优惠券是否处于活动状态(进行中(2))
         private boolean isActive(LocalDateTime now) {
             if (!Objects.equals(status, 2)) return false;
             if (beginTime != null && now.isBefore(beginTime)) return false;

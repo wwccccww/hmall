@@ -1,4 +1,9 @@
 hm:
+  seckill:
+    receive-rate-limit:
+      enabled: true
+      replenish-per-second: 10
+      burst: 20
   db:
     host: 192.168.116.130  # 修改为你自己的虚拟机IP地址
     pw: 123                # 修改为 docker 中的 MySQL 密码

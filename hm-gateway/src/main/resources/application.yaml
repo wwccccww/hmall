@@ -3,6 +3,11 @@ server:
 
 
 hm:
+  # 秒杀抢券：网关按「券 ID」聚合限流（Redis 令牌桶，RequestRateLimiter）
+  ratelimit:
+    receive:
+      replenish: 2000  # 每秒填充的令牌数
+      burst: 4000  # 令牌桶的容量
   jwt:
     location: classpath:hmall.jks
     alias: hmall
@@ -20,11 +25,29 @@ hm:
       - /coupons/redeem
 
 spring:
+  redis:
+    host: ${REDIS_HOST:192.168.116.130}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:123456}
   cloud:
     gateway:
       # 与 Nacos gateway-routes.json 并存；若 Nacos 中 Path 写成 /coupons（无 /**），则无法匹配 /coupons/my、/{id}/receive 等子路径导致 404
+      # 若使用 Nacos 动态路由且覆盖了本地路由，请在 gateway-routes.json 中同步增加本路由与 RequestRateLimiter
       routes:
+        - id: promotion-coupon-receive-ratelimit
+          order: -1
+          uri: lb://promotion-service
+          predicates:
+            - Path=/coupons/*/receive
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: ${hm.ratelimit.receive.replenish}
+                redis-rate-limiter.burstCapacity: ${hm.ratelimit.receive.burst}
+                key-resolver: "#{@couponReceiveKeyResolver}"
         - id: promotion-service-coupons
+          order: 0
           uri: lb://promotion-service
           predicates:
             - Path=/coupons/**
