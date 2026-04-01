@@ -28,6 +28,34 @@
     "uri": "lb://promotion-service"
   },
   {
+    "id": "ai-chat-ratelimit",
+    "order": -2,
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/ai/chat", "_genkey_1": "/ai/chat/sync" } },
+      { "name": "Method", "args": { "_genkey_0": "POST" } }
+    ],
+    "filters": [
+      {
+        "name": "RequestRateLimiter",
+        "args": {
+          "redis-rate-limiter.replenishRate": "20",
+          "redis-rate-limiter.burstCapacity": "40",
+          "key-resolver": "#{@aiChatKeyResolver}"
+        }
+      }
+    ],
+    "uri": "lb://ai-assistant-service"
+  },
+  {
+    "id": "ai",
+    "order": 1,
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/ai/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://ai-assistant-service"
+  },
+  {
     "id": "item",
     "predicates": [
       { "name": "Path", "args": { "_genkey_0": "/items/**", "_genkey_1": "/search/**" } }

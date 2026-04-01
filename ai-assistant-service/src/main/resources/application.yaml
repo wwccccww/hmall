@@ -1,0 +1,22 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: ai-assistant-service
+
+knife4j:
+  enable: true
+  openapi:
+    title: ${hm.swagger.title:AI 导购助手接口文档}
+    description: ${hm.swagger.description:AI 导购助手接口文档}
+    version: v1.0.0
+
+hm:
+  ai:
+    llm:
+      base-url: ${HM_AI_LLM_BASE_URL:https://api.openai.com}
+      api-key: ${HM_AI_LLM_API_KEY:}
+      model: ${HM_AI_LLM_MODEL:gpt-4o-mini}
+      timeout-ms: ${HM_AI_LLM_TIMEOUT_MS:15000}
+

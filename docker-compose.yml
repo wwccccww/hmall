@@ -327,6 +327,26 @@ services:
     networks:
       - hmall-net
 
+  ai-assistant-service:
+    build:
+      context: .
+      dockerfile: docker/services/ai-assistant-service/Dockerfile
+    container_name: hmall-ai-assistant-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_AI_LLM_BASE_URL: ${HM_AI_LLM_BASE_URL:-https://api.openai.com}
+      HM_AI_LLM_API_KEY: ${HM_AI_LLM_API_KEY:-}
+      HM_AI_LLM_MODEL: ${HM_AI_LLM_MODEL:-gpt-4o-mini}
+      HM_AI_LLM_TIMEOUT_MS: ${HM_AI_LLM_TIMEOUT_MS:-15000}
+    ports:
+      - "8090:8090"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
 volumes:
   hmall_mysql_data:
   hmall_redis_data:

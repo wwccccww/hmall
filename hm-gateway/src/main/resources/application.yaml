@@ -34,6 +34,23 @@ spring:
       # 与 Nacos gateway-routes.json 并存；若 Nacos 中 Path 写成 /coupons（无 /**），则无法匹配 /coupons/my、/{id}/receive 等子路径导致 404
       # 若使用 Nacos 动态路由且覆盖了本地路由，请在 gateway-routes.json 中同步增加本路由与 RequestRateLimiter
       routes:
+        - id: ai-chat-ratelimit
+          order: -2
+          uri: lb://ai-assistant-service
+          predicates:
+            - Path=/ai/chat,/ai/chat/sync
+            - Method=POST
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@aiChatKeyResolver}"
+        - id: ai-assistant
+          order: 1
+          uri: lb://ai-assistant-service
+          predicates:
+            - Path=/ai/**
         - id: promotion-coupon-receive-ratelimit
           order: -1
           uri: lb://promotion-service

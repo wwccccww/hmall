@@ -48,6 +48,18 @@ docker compose up -d --build
 
 脚本在 `scripts/k6/`。\n\n- 走网关：验证网关限流拦截（429）与保护下游\n- 直连促销：验证服务侧令牌桶与秒杀 Lua 行为\n\n详见 `scripts/k6/README.md`。
 
+## 3.1 AI 导购助手（用户态 RAG）
+
+- **文档**：`http://localhost:8090/doc.html`
+- **接口**：
+  - `POST /ai/chat/sync`：同步返回
+  - `POST /ai/chat`：SSE 流式返回（事件：`message` / `sources` / `done`）
+
+### 演示步骤
+
+1. 登录获取 JWT：`POST http://localhost:8080/users/login`
+2. 调用 AI（走网关）：`POST http://localhost:8080/ai/chat/sync`\n   - Header：`Authorization: Bearer <JWT>`\n   - Body：`{\"message\":\"我有哪些优惠券？\"}` 或 `{\"message\":\"订单 123456789 状态？\"}` 或 `{\"message\":\"推荐 2000 元左右手机\"}`
+
 ## 4. 常见问题
 
 - **`doc.html` 打不开 / 没接口**：检查 Nacos 中 `shared-swagger.yaml` 的占位符 `hm.swagger.*` 是否被各服务正确覆盖；或直接访问 `http://localhost:<port>/v2/api-docs` 看 `paths`。\n- **端口冲突**：修改 `docker-compose.yml` 的端口映射。\n- **数据库表缺失**：当前 Compose 仅内置 `hm-promotion` 的核心表初始化，其它服务表结构请按你环境补充 SQL（可逐步完善到 `docker/mysql/init/`）。\n

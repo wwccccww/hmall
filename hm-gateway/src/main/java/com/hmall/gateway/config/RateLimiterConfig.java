@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,6 +16,7 @@ import java.util.regex.Pattern;
 public class RateLimiterConfig {
 
     private static final Pattern COUPON_RECEIVE_PATH = Pattern.compile("^/coupons/(\\d+)/receive$");// 定义抢券路径的正则表达式
+    private static final Pattern AI_CHAT_PATH = Pattern.compile("^/ai/(chat|chat/sync)$");
 
     @Bean
     public KeyResolver couponReceiveKeyResolver() {
@@ -25,6 +27,27 @@ public class RateLimiterConfig {
                 return Mono.just("couponReceive:" + m.group(1)); // 返回令牌桶的键
             }
             return Mono.just("couponReceive:unknown"); // 返回默认键
+        };
+    }
+
+    /**
+     * AI 对话限流：优先按 user-info（登录用户）限流；未登录则按 IP 限流（避免被刷）。
+     */
+    @Bean
+    public KeyResolver aiChatKeyResolver() {
+        return exchange -> {
+            String path = exchange.getRequest().getURI().getPath();
+            if (!AI_CHAT_PATH.matcher(path).matches()) {
+                return Mono.just("aiChat:other");
+            }
+            String userInfo = exchange.getRequest().getHeaders().getFirst("user-info");
+            if (userInfo != null && !userInfo.isBlank()) {
+                return Mono.just("aiChat:user:" + userInfo.trim());
+            }
+            String ip = Optional.ofNullable(exchange.getRequest().getRemoteAddress())
+                    .map(a -> a.getAddress().getHostAddress())
+                    .orElse("unknown");
+            return Mono.just("aiChat:ip:" + ip);
         };
     }
 }

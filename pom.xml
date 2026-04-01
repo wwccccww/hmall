@@ -18,6 +18,7 @@
         <module>pay-service</module>
         <module>hm-gateway</module>
         <module>promotion-service</module>
+        <module>ai-assistant-service</module>
     </modules>
 
     <parent>
