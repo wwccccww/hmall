@@ -1,0 +1,5 @@
+hm:
+  db:
+    host: mysql
+    pw: ${MYSQL_ROOT_PASSWORD:123}
+

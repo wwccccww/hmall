@@ -1,0 +1,71 @@
+[
+  {
+    "id": "promotion-coupon-receive-ratelimit",
+    "order": -1,
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/coupons/*/receive" } },
+      { "name": "Method", "args": { "_genkey_0": "POST" } }
+    ],
+    "filters": [
+      {
+        "name": "RequestRateLimiter",
+        "args": {
+          "redis-rate-limiter.replenishRate": "2000",
+          "redis-rate-limiter.burstCapacity": "4000",
+          "key-resolver": "#{@couponReceiveKeyResolver}"
+        }
+      }
+    ],
+    "uri": "lb://promotion-service"
+  },
+  {
+    "id": "promotion",
+    "order": 0,
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/coupons/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://promotion-service"
+  },
+  {
+    "id": "item",
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/items/**", "_genkey_1": "/search/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://item-service"
+  },
+  {
+    "id": "cart",
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/carts/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://cart-service"
+  },
+  {
+    "id": "user",
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/users/**", "_genkey_1": "/addresses/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://user-service"
+  },
+  {
+    "id": "trade",
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/orders/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://trade-service"
+  },
+  {
+    "id": "pay",
+    "predicates": [
+      { "name": "Path", "args": { "_genkey_0": "/pay-orders/**" } }
+    ],
+    "filters": [],
+    "uri": "lb://pay-service"
+  }
+]
+

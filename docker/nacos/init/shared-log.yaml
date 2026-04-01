@@ -1,0 +1,8 @@
+logging:
+  level:
+    com.hmall: info
+  pattern:
+    dateformat: HH:mm:ss:SSS
+  file:
+    path: "logs/${spring.application.name}"
+

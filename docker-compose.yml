@@ -1,0 +1,337 @@
+services:
+  mysql:
+    image: mysql:8.0.23
+    container_name: hmall-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "3306:3306"
+    volumes:
+      - hmall_mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-123}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - hmall-net
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: hmall-redis
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-123456}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - hmall_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-123456}", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - hmall-net
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: hmall-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-sail}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-123}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/hmall}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - hmall-net
+
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: hmall-nacos
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_DB_NAME: nacos_config
+      MYSQL_SERVICE_USER: root
+      MYSQL_SERVICE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123}
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+      JVM_XMN: 128m
+      NACOS_AUTH_ENABLE: "false"
+    ports:
+      - "8848:8848"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8848/nacos/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    networks:
+      - hmall-net
+
+  nacos-seed:
+    image: curlimages/curl:8.7.1
+    container_name: hmall-nacos-seed
+    depends_on:
+      nacos:
+        condition: service_healthy
+    volumes:
+      - ./docker/nacos/init:/init:ro
+    entrypoint: ["/bin/sh", "/init/seed.sh"]
+    environment:
+      NACOS_ADDR: http://nacos:8848
+      NACOS_NS: public
+      NACOS_GROUP: DEFAULT_GROUP
+    restart: "no"
+    networks:
+      - hmall-net
+
+  hm-gateway:
+    build:
+      context: .
+      dockerfile: docker/services/hm-gateway/Dockerfile
+    container_name: hmall-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+    ports:
+      - "8080:8080"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  item-service:
+    build:
+      context: .
+      dockerfile: docker/services/item-service/Dockerfile
+    container_name: hmall-item-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+    ports:
+      - "8081:8081"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: docker/services/cart-service/Dockerfile
+    container_name: hmall-cart-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+    ports:
+      - "8082:8082"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  user-service:
+    build:
+      context: .
+      dockerfile: docker/services/user-service/Dockerfile
+    container_name: hmall-user-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+    ports:
+      - "8084:8084"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  trade-service:
+    build:
+      context: .
+      dockerfile: docker/services/trade-service/Dockerfile
+    container_name: hmall-trade-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
+    ports:
+      - "8085:8085"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  pay-service:
+    build:
+      context: .
+      dockerfile: docker/services/pay-service/Dockerfile
+    container_name: hmall-pay-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
+    ports:
+      - "8086:8086"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  promotion-service:
+    build:
+      context: .
+      dockerfile: docker/services/promotion-service/Dockerfile
+    container_name: hmall-promotion-service
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
+    ports:
+      - "8087:8087"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+  promotion-service-2:
+    build:
+      context: .
+      dockerfile: docker/services/promotion-service/Dockerfile
+    container_name: hmall-promotion-service-2
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      HM_DB_HOST: mysql
+      HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
+      JAVA_OPTS: "--server.port=8088 --spring.application.instance-id=promotion-8088"
+    ports:
+      - "8088:8088"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
+volumes:
+  hmall_mysql_data:
+  hmall_redis_data:
+
+networks:
+  hmall-net:
+    driver: bridge
+

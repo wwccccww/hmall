@@ -17,6 +17,11 @@
 
 ## 走网关（推荐）
 
+### Compose 环境变量建议
+
+- **走网关**：`BASE_URL=http://localhost:8080`
+- **直连促销**：`BASE_URL=http://localhost:8087`（第二实例为 `http://localhost:8088`）
+
 ### 单用户（所有 VU 共用一个 JWT）
 
 适合测「同一账号高并发」或服务内按 userId 的限流桶。
@@ -65,6 +70,8 @@ k6 run scripts/k6/seckill-receive-direct.js
 - **2xx 数量**：近似不超过券库存（还要扣掉未开始/已结束等非 2xx 业务情况）。
 - **429**：网关或服务侧令牌桶限流生效。
 - Windows 本机高并发若出现 `connectex` / 端口相关错误，可适当增大脚本中的 `sleep`，或降低 `target` VUs，或将 k6 与业务拆到不同机器。
+
+在 Docker Compose 环境下若出现 `dial: i/o timeout`：通常是并发过高导致目标容器/宿主机连接承载不足，建议先降低 VU 或增大 `sleep` 验证链路，再逐步上压。
 
 ## 与配置项的对应关系
 
