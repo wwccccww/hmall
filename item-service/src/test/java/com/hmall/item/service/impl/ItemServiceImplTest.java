@@ -1,21 +1,18 @@
 package com.hmall.item.service.impl;
 
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmall.item.domain.po.Item;
 import com.hmall.item.domain.po.ItemDoc;
 import com.hmall.item.service.IItemService;
-import org.apache.http.HttpHost;
-import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,125 +21,103 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * ES 商品索引：一键创建 mapping + 从 MySQL 同步上架商品（status=1）到 {@code items}。
+ * <p>
+ * 前置：<br>
+ * 1. 本机/虚拟机已启动 Elasticsearch（默认地址与 {@code hm.es.host} 一致，见 {@code ElasticsearchConfig}）。<br>
+ * 2. 已安装 IK 分词插件（mapping 中 name/spec/all 使用 {@code ik_max_word}）；若无 IK，请把 {@link #MAPPING_TEMPLATE} 里对应 analyzer 改为 {@code standard}。<br>
+ * 3. {@code spring.profiles.active=local} 下 MySQL {@code hm-item} 有商品数据。
+ */
 @SpringBootTest(properties = "spring.profiles.active=local")
 class ItemServiceImplTest {
 
+    private static final String INDEX = "items";
+    private static final int BULK_PAGE_SIZE = 500;
 
-    //测试redis连接
+    /**
+     * 与 {@link ItemDoc} 及 {@code SearchController} 使用的字段对齐。
+     */
+    static final String MAPPING_TEMPLATE = "{\n"
+            + "  \"mappings\": {\n"
+            + "    \"properties\": {\n"
+            + "      \"id\": { \"type\": \"long\" },\n"
+            + "      \"name\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" },\n"
+            + "      \"price\": { \"type\": \"integer\" },\n"
+            + "      \"stock\": { \"type\": \"integer\" },\n"
+            + "      \"image\": { \"type\": \"keyword\", \"index\": false },\n"
+            + "      \"category\": { \"type\": \"keyword\" },\n"
+            + "      \"brand\": { \"type\": \"keyword\" },\n"
+            + "      \"spec\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" },\n"
+            + "      \"sold\": { \"type\": \"integer\" },\n"
+            + "      \"commentCount\": { \"type\": \"integer\" },\n"
+            + "      \"isAD\": { \"type\": \"boolean\" },\n"
+            + "      \"status\": { \"type\": \"integer\" },\n"
+            + "      \"createTime\": { \"type\": \"date\" },\n"
+            + "      \"updateTime\": { \"type\": \"date\" },\n"
+            + "      \"creater\": { \"type\": \"long\" },\n"
+            + "      \"updater\": { \"type\": \"long\" },\n"
+            + "      \"all\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" }\n"
+            + "    }\n"
+            + "  }\n"
+            + "}";
+
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired
+    private RestHighLevelClient restHighLevelClient;
+
+    @Autowired
+    private IItemService itemService;
 
     @Test
     void testRedisConnect() {
         stringRedisTemplate.opsForValue().set("cursor:test:key", "Connection_Success");
-    
-        // 2. 尝试读取
         String result = stringRedisTemplate.opsForValue().get("cursor:test:key");
-        
-        // 3. 强力打印（加上明显的前缀方便搜索）
         System.out.println("================================");
         System.out.println("Redis result >>> " + result);
         System.out.println("================================");
     }
-    // private RestHighLevelClient client;
 
-    // @Autowired
-    // private IItemService itemService;
+    @Test
+    @DisplayName("创建 items 索引（若不存在）并将上架商品全量同步到 ES")
+    void syncItemsToElasticsearch() throws IOException {
+        ensureItemsIndex();
+        int pageNo = 1;
+        long totalIndexed = 0;
+        while (true) {
+            List<Item> items = itemService.lambdaQuery()
+                    .eq(Item::getStatus, 1)
+                    .page(new Page<>(pageNo, BULK_PAGE_SIZE))
+                    .getRecords();
+            if (items == null || items.isEmpty()) {
+                break;
+            }
+            BulkRequest bulk = new BulkRequest();
+            for (Item item : items) {
+                ItemDoc doc = new ItemDoc(item);
+                bulk.add(new IndexRequest(INDEX)
+                        .id(doc.getId().toString())
+                        .source(JSONUtil.toJsonStr(doc), XContentType.JSON));
+            }
+            restHighLevelClient.bulk(bulk, RequestOptions.DEFAULT);
+            totalIndexed += items.size();
+            System.out.println("已写入 ES 第 " + pageNo + " 批，本批 " + items.size() + " 条，累计 " + totalIndexed);
+            pageNo++;
+        }
+        System.out.println("同步完成，共 " + totalIndexed + " 条（仅 status=1）");
+    }
 
-    // @BeforeEach
-    // void setUp() {
-    //     this.client = new RestHighLevelClient(RestClient.builder(
-    //             HttpHost.create("http://192.168.116.130:9200")
-    //     ));
-    // }
-
-    // @Test
-    // void testConnect() {
-    //     System.out.println(client);
-    // }
-
-    // @Test
-    // void testCreateIndex() throws IOException {
-    //     // 1.创建Request对象
-    //     CreateIndexRequest request = new CreateIndexRequest("items");
-    //     // 2.准备请求参数
-    //     request.source(MAPPING_TEMPLATE, XContentType.JSON);
-    //     // 3.发送请求
-    //     client.indices().create(request, RequestOptions.DEFAULT);
-    // }
-
-    // @Test
-    // void testDeleteIndex() throws IOException {
-    //     // 1.创建Request对象
-    //     DeleteIndexRequest request = new DeleteIndexRequest("items");
-    //     // 2.发送请求
-    //     client.indices().delete(request, RequestOptions.DEFAULT);
-    //     System.out.println("索引删除成功！");
-    // }
-
-    // @Test
-    // void testExistsIndex() throws IOException {
-    //     // 1.创建Request对象
-    //     GetIndexRequest request = new GetIndexRequest("items");
-    //     // 2.发送请求
-    //     boolean exists = client.indices().exists(request, RequestOptions.DEFAULT);
-    //     // 3.输出
-    //     System.err.println(exists ? "索引库已经存在！" : "索引库不存在！");
-    // }
-
-    // @Test
-    // void testBulkExport() throws IOException {
-    //     // 1.分批查询数据库数据
-    //     int pageNo = 1;
-    //     int pageSize = 500;
-    //     while (true) {
-    //         List<Item> items = itemService.lambdaQuery()
-    //                 .eq(Item::getStatus, 1)
-    //                 .page(new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNo, pageSize))
-    //                 .getRecords();
-    //         if (items == null || items.size() == 0) {
-    //             break;
-    //         }
-    //         // 2.准备BulkRequest
-    //         BulkRequest request = new BulkRequest();
-    //         for (Item item : items) {
-    //             // 2.1.转换为ItemDoc
-    //             ItemDoc itemDoc = new ItemDoc(item);
-    //             // 2.2.创建IndexRequest
-    //             request.add(new IndexRequest("items")
-    //                     .id(itemDoc.getId().toString())
-    //                     .source(JSONUtil.toJsonStr(itemDoc), XContentType.JSON));
-    //         }
-    //         // 3.发送请求
-    //         client.bulk(request, RequestOptions.DEFAULT);
-            
-    //         System.out.println("成功导入第 " + pageNo + " 页数据，共 " + items.size() + " 条");
-    //         pageNo++;
-    //     }
-    // }
-
-    // @AfterEach
-    // void tearDown() throws IOException {
-    //     this.client.close();
-    // }
-
-    // static final String MAPPING_TEMPLATE = "{\n" +
-    //         "  \"mappings\": {\n" +
-    //         "    \"properties\": {\n" +
-    //         "      \"id\": { \"type\": \"keyword\" },\n" +
-    //         "      \"name\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\", \"copy_to\": \"all\" },\n" +
-    //         "      \"price\": { \"type\": \"integer\" },\n" +
-    //         "      \"stock\": { \"type\": \"integer\" },\n" +
-    //         "      \"image\": { \"type\": \"keyword\", \"index\": false },\n" +
-    //         "      \"category\": { \"type\": \"keyword\", \"copy_to\": \"all\" },\n" +
-    //         "      \"brand\": { \"type\": \"keyword\", \"copy_to\": \"all\" },\n" +
-    //         "      \"sold\": { \"type\": \"integer\" },\n" +
-    //         "      \"commentCount\": { \"type\": \"integer\" },\n" +
-    //         "      \"isAD\": { \"type\": \"boolean\" },\n" +
-    //         "      \"updateTime\": { \"type\": \"date\" },\n" +
-    //         "      \"all\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" }\n" +
-    //         "    }\n" +
-    //         "  }\n" +
-    //         "}";
+    private void ensureItemsIndex() throws IOException {
+        GetIndexRequest exists = new GetIndexRequest(INDEX);
+        if (restHighLevelClient.indices().exists(exists, RequestOptions.DEFAULT)) {
+            System.out.println("索引 " + INDEX + " 已存在，跳过创建；直接 bulk 覆盖写入文档。");
+            return;
+        }
+        CreateIndexRequest create = new CreateIndexRequest(INDEX);
+        create.source(MAPPING_TEMPLATE, XContentType.JSON);
+        restHighLevelClient.indices().create(create, RequestOptions.DEFAULT);
+        System.out.println("已创建索引 " + INDEX);
+    }
 }

@@ -7,10 +7,12 @@
 ```mermaid
 flowchart TD
   UserMsg[用户消息] --> ToolMatch{tryToolCall 关键词匹配}
-  ToolMatch -->|命中| ToolPath[工具路径：查下游 + 可选 LLM 合成]
-  ToolMatch -->|未命中| RAGPath[RAG：SimpleRagService]
-  RAGPath --> LLM[LlmClient.chat 百炼兼容接口]
-  LLM --> Answer[回答 + sources]
+  ToolMatch -->|命中| ToolPath[工具路径：查下游 + Chat Completions 合成]
+  ToolMatch -->|未命中| Branch{配置了 bailian-app-id?}
+  Branch -->|是| Bailian[BailianResponsesClient Responses API]
+  Branch -->|否| RAGPath[SimpleRagService 本地候选 + Chat Completions]
+  Bailian --> Answer[回答 + sources]
+  RAGPath --> Answer
 ```
 
 ### 1) 工具路径（`tryToolCall`）
@@ -24,13 +26,24 @@ flowchart TD
 
 命中工具路径时：返回结构化 `sources`；若已配置 `HM_AI_LLM_API_KEY`，会**先工具后 LLM**，用查询结果合成自然语言回答；未配置或调用失败则使用预设短文案。SSE 分支发 `result` 事件。
 
-### 2) 通用导购路径（RAG + LLM，`SimpleRagService`）
+### 2) 通用导购路径
 
-- **商品**：对 `item-service` 调用 `GET /items/page`，按配置 **`hm.ai.rag.item-max-pages`**（默认 2）连续拉取多页（每页 `pageSize=50`），合并后在本地用截断后的用户问题做关键词包含过滤；若无命中则用**前 8 条**兜底。
-- **公开进行中优惠券**：对 `promotion-service` 调用 **`GET /coupons`**（免登录），取前 **`hm.ai.rag.public-coupon-max`**（默认 15）条，将规则摘要拼进 prompt，并写入 `sources`（`type=public_coupon`）。拉取失败则仅使用商品上下文。
-- 把候选商品与券摘要拼进 prompt，规则写明须**仅基于所给信息**回答，再调用 `LlmClient.chat`。
+#### A. 百炼内置 RAG（推荐，需控制台配置）
 
-**注意**：用户私有「我的优惠券」「地址」仍仅在工具关键词命中时查询，不会自动进入 RAG 路径。
+若设置 **`hm.ai.llm.bailian-app-id`**（环境变量 **`HM_AI_BAILIAN_APP_ID`**）：
+
+- 在 [百炼应用中心](https://bailian.console.aliyun.com/) 创建**智能体**（或工作流），在应用内**绑定知识库**并发布。
+- 本服务通过 **`BailianResponsesClient`** 调用官方 **Responses API**：`POST .../api/v2/apps/agent/{APP_ID}/compatible-mode/v1/responses`，将用户问题发给该应用；**检索与拼接在百炼侧完成**。
+- 返回的 `sources` 中会带一条 `type=bailian_app` 的说明（非逐条检索片段，具体引用格式以控制台应用为准）。
+- 若调用失败或返回空文本，会**自动回退**到下方本地 RAG。
+
+#### B. 本地 RAG + Chat Completions（未配置应用 ID 或回退时）
+
+- **商品**：对 `item-service` 调用 `GET /items/page`，按 **`hm.ai.rag.item-max-pages`**（默认 2）分页拉取，关键词过滤；若无命中则用**前 8 条**兜底。
+- **公开券**：`GET /coupons`，最多 **`hm.ai.rag.public-coupon-max`** 条写入 prompt。
+- 拼 prompt 后调用 **`LlmClient.chat`**（OpenAI 兼容 `/v1/chat/completions`，与 `hm.ai.llm.base-url` 一致）。
+
+**注意**：用户私有「我的优惠券」「地址」仍仅在工具关键词命中时查询；工具合成**始终**走 Chat Completions，不会走百炼应用 Responses，以免干扰结构化 JSON 提示。
 
 ---
 
@@ -55,4 +68,6 @@ flowchart TD
 | `HM_AI_PROMOTION_BASE_URL` / `hm.ai.rag.promotion-base-url` | 促销服务基址（公开券列表） |
 | `hm.ai.rag.item-max-pages` | RAG 拉商品页数上限 |
 | `hm.ai.rag.public-coupon-max` | 公开券写入 prompt 的最大条数 |
-| `HM_AI_LLM_*` | 大模型 OpenAI 兼容接口 |
+| `HM_AI_LLM_*` | 大模型 OpenAI 兼容接口（`base-url` 一般为 `https://dashscope.aliyuncs.com/compatible-mode/v1`） |
+| `HM_AI_BAILIAN_APP_ID` / `hm.ai.llm.bailian-app-id` | 百炼应用 ID；非空则通用导购走 Responses API |
+| `HM_AI_BAILIAN_ENDPOINT_BASE` | 可选，默认 `https://dashscope.aliyuncs.com`（国际地域可换） |

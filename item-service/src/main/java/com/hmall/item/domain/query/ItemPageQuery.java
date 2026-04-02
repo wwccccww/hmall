@@ -20,4 +20,9 @@ public class ItemPageQuery extends PageQuery {
     private Integer minPrice;
     @ApiModelProperty("价格最大值")
     private Integer maxPrice;
+    /**
+     * 商品状态：1 上架，2 下架，3 删除。不传则仅查上架（1），与同步到 ES 的数据一致。
+     */
+    @ApiModelProperty("商品状态，不传默认 1（仅上架）")
+    private Integer status;
 }

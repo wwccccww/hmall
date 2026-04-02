@@ -63,7 +63,7 @@ docker compose up -d --build
 
 ### 配置百炼模型（推荐用根目录 `.env`）
 
-根目录 `.env` 已预置以下变量（把 `HM_AI_LLM_API_KEY` 换成你自己的 Key）：\n- `HM_AI_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode`\n- `HM_AI_LLM_MODEL=qwen-turbo-2025-07-15`\n\n启动（或重建）AI 服务：\n- `docker compose up -d --build ai-assistant-service`
+根目录 `.env` 已预置以下变量（把 `HM_AI_LLM_API_KEY` 换成你自己的 Key）：\n- `HM_AI_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode`\n- `HM_AI_LLM_MODEL=qwen-turbo-2025-07-15`\n\n**可选：百炼控制台创建智能体并绑定知识库后**，设置 `HM_AI_BAILIAN_APP_ID=<应用ID>`，通用导购将优先走百炼内置 RAG（失败时回退本地商品/券 RAG）。详见 `ai-assistant-service/AI_ASSISTANT_LOGIC.md`。\n\n启动（或重建）AI 服务：\n- `docker compose up -d --build ai-assistant-service`
 
 ## 4. 常见问题
 

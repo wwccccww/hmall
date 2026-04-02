@@ -22,6 +22,9 @@ hm:
       api-key: ${HM_AI_LLM_API_KEY:}
       model: ${HM_AI_LLM_MODEL:gpt-4o-mini}
       timeout-ms: ${HM_AI_LLM_TIMEOUT_MS:15000}
+      # 非空时：通用导购走百炼「智能体」Responses API（控制台绑定知识库即可启用内置 RAG）
+      bailian-app-id: ${HM_AI_BAILIAN_APP_ID:}
+      bailian-endpoint-base: ${HM_AI_BAILIAN_ENDPOINT_BASE:https://dashscope.aliyuncs.com}
     rag:
       item-base-url: ${HM_AI_ITEM_BASE_URL:http://item-service:8081}
       promotion-base-url: ${HM_AI_PROMOTION_BASE_URL:http://promotion-service:8087}

@@ -1,6 +1,7 @@
 package com.hmall.ai.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmall.ai.llm.BailianResponsesClient;
 import com.hmall.ai.llm.LlmClient;
 import com.hmall.ai.llm.LlmProperties;
 import com.hmall.ai.web.dto.ChatRequest;
@@ -30,11 +31,15 @@ public class AiChatServiceImpl implements AiChatService {
 
     private final LlmClient llmClient;
     private final LlmProperties llmProperties;
+    private final BailianResponsesClient bailianResponsesClient;
     private final ObjectMapper objectMapper;
     private final SimpleRagService ragService;
     private final UserTools userTools;
 
     private static final Pattern ORDER_ID = Pattern.compile("(\\d{6,})");
+
+    private static final String BAILIAN_INPUT_PREFIX =
+            "你是电商导购助手，请用中文、结合知识库（如有）简洁回答；勿编造知识库未提供的事实。\n\n用户问题：\n";
 
     @Override
     public ChatResponse chatSync(ChatRequest request) {
@@ -42,11 +47,10 @@ public class AiChatServiceImpl implements AiChatService {
         if (tool != null) {
             return tool;
         }
-        var rag = ragService.buildRagPrompt(request.getMessage());
-        String answer = llmClient.chat(rag.prompt());
+        GeneralAnswer ga = resolveGeneralAnswer(request.getMessage());
         return ChatResponse.builder()
-                .answer(answer)
-                .sources(rag.sources())
+                .answer(ga.answer)
+                .sources(ga.sources)
                 .actions(List.of())
                 .build();
     }
@@ -66,17 +70,17 @@ public class AiChatServiceImpl implements AiChatService {
             emitter.complete();
             return emitter;
         }
-        var rag = ragService.buildRagPrompt(request.getMessage());
         CompletableFuture.runAsync(() -> {
             try {
-                String answer = llmClient.chat(rag.prompt());
+                GeneralAnswer ga = resolveGeneralAnswer(request.getMessage());
+                String answer = ga.answer;
                 if (answer == null) {
                     answer = "";
                 }
                 for (String chunk : splitToChunks(answer, 40)) {
                     emitter.send(SseEmitter.event().name("message").data((Object) Map.of("delta", chunk)));
                 }
-                emitter.send(SseEmitter.event().name("sources").data((Object) Map.of("sources", rag.sources())));
+                emitter.send(SseEmitter.event().name("sources").data((Object) Map.of("sources", ga.sources)));
                 emitter.send(SseEmitter.event().name("done").data((Object) Map.of("ok", true)));
                 emitter.complete();
             } catch (Exception e) {
@@ -101,6 +105,43 @@ public class AiChatServiceImpl implements AiChatService {
             out.add(text.substring(i, Math.min(len, i + n)));
         }
         return out;
+    }
+
+    /**
+     * 通用导购：若配置了百炼应用 ID，则优先走 Responses API（控制台可绑知识库，内置 RAG）；失败或空结果时回退本地 SimpleRag + Chat Completions。
+     */
+    private GeneralAnswer resolveGeneralAnswer(String message) {
+        if (bailianResponsesClient.enabled()) {
+            try {
+                String answer = bailianResponsesClient.complete(BAILIAN_INPUT_PREFIX + message);
+                if (answer != null && !answer.isBlank()) {
+                    return new GeneralAnswer(answer, bailianSourceMeta());
+                }
+            } catch (Exception e) {
+                log.warn("Bailian Responses 调用失败，回退本地 RAG: {}", e.getMessage());
+            }
+        }
+        var rag = ragService.buildRagPrompt(message);
+        String answer = llmClient.chat(rag.prompt());
+        return new GeneralAnswer(answer == null ? "" : answer, rag.sources());
+    }
+
+    private List<Map<String, Object>> bailianSourceMeta() {
+        return List.of(Map.of(
+                "type", "bailian_app",
+                "appId", String.valueOf(llmProperties.getBailianAppId()),
+                "note", "回答由百炼智能体生成；知识库检索在百炼侧完成（见控制台应用配置）"
+        ));
+    }
+
+    private static final class GeneralAnswer {
+        final String answer;
+        final List<Map<String, Object>> sources;
+
+        GeneralAnswer(String answer, List<Map<String, Object>> sources) {
+            this.answer = answer;
+            this.sources = sources;
+        }
     }
 
     /**
