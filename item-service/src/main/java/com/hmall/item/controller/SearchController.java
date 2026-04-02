@@ -100,6 +100,8 @@ public class SearchController {
             boolQuery.should(allMatch);
             boolQuery.should(QueryBuilders.matchQuery("name", key).operator(Operator.OR).boost(2.0f));
             boolQuery.should(QueryBuilders.matchQuery("spec", key).operator(Operator.OR).boost(1.8f));
+            boolQuery.should(QueryBuilders.matchQuery("specColor", key).operator(Operator.OR).boost(2.3f));
+            boolQuery.should(QueryBuilders.matchQuery("specSize", key).operator(Operator.OR).boost(1.0f));
             boolQuery.should(QueryBuilders.matchQuery("brand", key).operator(Operator.OR).boost(1.2f));
             boolQuery.should(QueryBuilders.matchQuery("category", key).operator(Operator.OR).boost(1.2f));
 

@@ -21,8 +21,12 @@ public class ItemDTO {
     private String category;
     @ApiModelProperty("品牌名称")
     private String brand;
-    @ApiModelProperty("规格")
+    @ApiModelProperty("规格（可能为 JSON 字符串）")
     private String spec;
+    @ApiModelProperty("规格-颜色（从 spec JSON 解析，检索用）")
+    private String specColor;
+    @ApiModelProperty("规格-尺寸（从 spec JSON 解析）")
+    private String specSize;
     @ApiModelProperty("销量")
     private Integer sold;
     @ApiModelProperty("评论数")

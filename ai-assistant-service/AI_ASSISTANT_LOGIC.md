@@ -39,19 +39,29 @@ flowchart TD
 
 #### B. 本地 RAG + Chat Completions（未配置应用 ID 或回退时）
 
-- **商品**：对 `item-service` 调用 `GET /items/page`，按 **`hm.ai.rag.item-max-pages`**（默认 2）分页拉取，关键词过滤；若无命中则用**前 8 条**兜底。
+- **商品（优先 ES）**：`SimpleRagService` 对用户消息做 **`ShoppingIntentParser` 轻量解析**（预算区间→`minPrice`/`maxPrice` 分、常见品牌→`brand`），再调 **`GET /search/list`**（与 [`SearchController`](d:/1study/study/java/program/hmall/item-service/src/main/java/com/hmall/item/controller/SearchController.java) 一致，`status=1`）。默认取 Top-K（**`hm.ai.rag.search-top-k`**），写入 prompt 时再按 **`hm.ai.rag.prompt-max-items`** 截断。若 ES 无结果或调用失败，回退 **`GET /items/page`** 分页 + 关键词过滤。
 - **公开券**：`GET /coupons`，最多 **`hm.ai.rag.public-coupon-max`** 条写入 prompt。
 - 拼 prompt 后调用 **`LlmClient.chat`**（OpenAI 兼容 `/v1/chat/completions`，与 `hm.ai.llm.base-url` 一致）。
 
 **注意**：用户私有「我的优惠券」「地址」仍仅在工具关键词命中时查询；工具合成**始终**走 Chat Completions，不会走百炼应用 Responses，以免干扰结构化 JSON 提示。
 
+#### C. 百炼智能体侧「商品工具」（与本地 ES 一致）
+
+若通用问答走百炼、且希望**推荐落在真实 SKU**，请在百炼应用控制台为智能体配置 **HTTP 工具**（具体名称以控制台为准），请求示例：
+
+- **方法**：`GET`
+- **URL**（经网关示例）：`http://<gateway-host>:8080/search/list`
+- **Query**（与 `ItemPageQuery` 一致，可按用户填槽传入）：`pageNo=1`、`pageSize=20`、`key=<用户原话或压缩关键词>`、`brand=`、`minPrice=`、`maxPrice=`（单位：**分**）、`status=1`
+- **鉴权**：若网关对 `/search/**` 免 JWT（见网关配置），可直接调；否则需带与前端一致的 `Authorization`。
+
+将工具返回的 `list`（商品 JSON）作为模型生成回答的依据，可避免「搜不到却瞎编」。
 ---
 
 ## 「能否读完所有商品、优惠券、地址」？
 
 | 数据 | 是否「全量」进入模型上下文 | 说明 |
 |------|---------------------------|------|
-| 商品 | **否** | 多页分页有上限；再筛最多 8 条进 prompt |
+| 商品 | **否** | 优先 ES `search-top-k` 召回，进 prompt 再截断 `prompt-max-items`；回退分页有上限 |
 | 公开进行中券 | **否** | 仅 `GET /coupons` 摘要前 N 条 |
 | 我的优惠券 | **仅关键词触发** | `/coupons/my`；工具路径可走 LLM 合成 |
 | 地址 | **仅关键词触发** | 脱敏后字段有限 |
@@ -64,7 +74,10 @@ flowchart TD
 
 | 变量 / 配置 | 含义 |
 |-------------|------|
-| `HM_AI_ITEM_BASE_URL` / `hm.ai.rag.item-base-url` | 商品服务基址 |
+| `HM_AI_ITEM_BASE_URL` / `hm.ai.rag.item-base-url` | 商品服务基址（同时用于 `/search/list` 与 `/items/page`） |
+| `HM_AI_RAG_USE_ES` / `hm.ai.rag.use-elasticsearch` | 是否优先走 ES，默认 `true` |
+| `HM_AI_RAG_SEARCH_TOP_K` / `hm.ai.rag.search-top-k` | `/search/list` 每页召回条数上限 |
+| `HM_AI_RAG_PROMPT_MAX_ITEMS` / `hm.ai.rag.prompt-max-items` | 写入 prompt 的商品条数上限 |
 | `HM_AI_PROMOTION_BASE_URL` / `hm.ai.rag.promotion-base-url` | 促销服务基址（公开券列表） |
 | `hm.ai.rag.item-max-pages` | RAG 拉商品页数上限 |
 | `hm.ai.rag.public-coupon-max` | 公开券写入 prompt 的最大条数 |

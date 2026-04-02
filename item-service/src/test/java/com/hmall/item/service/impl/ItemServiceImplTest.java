@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmall.item.domain.po.Item;
 import com.hmall.item.domain.po.ItemDoc;
 import com.hmall.item.service.IItemService;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.RequestOptions;
@@ -22,7 +23,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * ES 商品索引：一键创建 mapping + 从 MySQL 同步上架商品（status=1）到 {@code items}。
+ * ES 商品索引：每次同步会先删除 {@code items} 索引再重建（避免旧 mapping 缺字段），然后从 MySQL 全量导入上架商品（status=1）。
  * <p>
  * 前置：<br>
  * 1. 本机/虚拟机已启动 Elasticsearch（默认地址与 {@code hm.es.host} 一致，见 {@code ElasticsearchConfig}）。<br>
@@ -49,6 +50,8 @@ class ItemServiceImplTest {
             + "      \"category\": { \"type\": \"keyword\" },\n"
             + "      \"brand\": { \"type\": \"keyword\" },\n"
             + "      \"spec\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" },\n"
+            + "      \"specColor\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" },\n"
+            + "      \"specSize\": { \"type\": \"text\", \"analyzer\": \"ik_max_word\" },\n"
             + "      \"sold\": { \"type\": \"integer\" },\n"
             + "      \"commentCount\": { \"type\": \"integer\" },\n"
             + "      \"isAD\": { \"type\": \"boolean\" },\n"
@@ -81,9 +84,9 @@ class ItemServiceImplTest {
     }
 
     @Test
-    @DisplayName("创建 items 索引（若不存在）并将上架商品全量同步到 ES")
+    @DisplayName("删除并重建 items 索引，再将上架商品全量同步到 ES")
     void syncItemsToElasticsearch() throws IOException {
-        ensureItemsIndex();
+        recreateItemsIndex();
         int pageNo = 1;
         long totalIndexed = 0;
         while (true) {
@@ -109,15 +112,19 @@ class ItemServiceImplTest {
         System.out.println("同步完成，共 " + totalIndexed + " 条（仅 status=1）");
     }
 
-    private void ensureItemsIndex() throws IOException {
+    /**
+     * 删除旧索引（若存在）后按 {@link #MAPPING_TEMPLATE} 重建，保证与新字段（如 specColor/specSize）一致。
+     */
+    private void recreateItemsIndex() throws IOException {
         GetIndexRequest exists = new GetIndexRequest(INDEX);
         if (restHighLevelClient.indices().exists(exists, RequestOptions.DEFAULT)) {
-            System.out.println("索引 " + INDEX + " 已存在，跳过创建；直接 bulk 覆盖写入文档。");
-            return;
+            DeleteIndexRequest del = new DeleteIndexRequest(INDEX);
+            restHighLevelClient.indices().delete(del, RequestOptions.DEFAULT);
+            System.out.println("已删除旧索引 " + INDEX);
         }
         CreateIndexRequest create = new CreateIndexRequest(INDEX);
         create.source(MAPPING_TEMPLATE, XContentType.JSON);
         restHighLevelClient.indices().create(create, RequestOptions.DEFAULT);
-        System.out.println("已创建索引 " + INDEX);
+        System.out.println("已按最新 mapping 创建索引 " + INDEX);
     }
 }
