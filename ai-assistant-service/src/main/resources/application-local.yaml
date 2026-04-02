@@ -1,8 +1,3 @@
-spring:
-  cloud:
-    nacos:
-      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:localhost:8848}
-
 hm:
   swagger:
     title: AI 导购助手接口文档

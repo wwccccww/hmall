@@ -28,3 +28,5 @@ build/
 
 # k6 压测用的真实 JWT，勿提交
 scripts/k6/tokens.json
+
+.env

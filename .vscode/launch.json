@@ -10,7 +10,6 @@
         }
     ],
     "configurations": [
-
         {
             "type": "java",
             "name": "Spring Boot-TradeApplication<hm-trade>",
@@ -97,6 +96,16 @@
             "args": "--server.port=8088 --spring.application.instance-id=promotion-8088",
             "envFile": "${workspaceFolder}/.env",
             "vmArgs": " -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=61088 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dspring.jmx.enabled=true -Djava.rmi.server.hostname=localhost -Dspring.application.admin.enabled=true -Dspring.boot.project.name=promotion-service"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-AiAssistantApplication<ai-assistant-service>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.hmall.ai.AiAssistantApplication",
+            "projectName": "ai-assistant-service",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }

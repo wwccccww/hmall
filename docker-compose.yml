@@ -339,6 +339,8 @@ services:
       HM_AI_LLM_API_KEY: ${HM_AI_LLM_API_KEY:-}
       HM_AI_LLM_MODEL: ${HM_AI_LLM_MODEL:-gpt-4o-mini}
       HM_AI_LLM_TIMEOUT_MS: ${HM_AI_LLM_TIMEOUT_MS:-15000}
+      HM_AI_ITEM_BASE_URL: ${HM_AI_ITEM_BASE_URL:-http://item-service:8081}
+      HM_AI_PROMOTION_BASE_URL: ${HM_AI_PROMOTION_BASE_URL:-http://promotion-service:8087}
     ports:
       - "8090:8090"
     depends_on:

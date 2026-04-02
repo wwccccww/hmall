@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: ai-assistant-service
+  output:
+    ansi:
+      enabled: ALWAYS
 
 knife4j:
   enable: true
@@ -19,4 +22,9 @@ hm:
       api-key: ${HM_AI_LLM_API_KEY:}
       model: ${HM_AI_LLM_MODEL:gpt-4o-mini}
       timeout-ms: ${HM_AI_LLM_TIMEOUT_MS:15000}
+    rag:
+      item-base-url: ${HM_AI_ITEM_BASE_URL:http://item-service:8081}
+      promotion-base-url: ${HM_AI_PROMOTION_BASE_URL:http://promotion-service:8087}
+      item-max-pages: ${HM_AI_RAG_ITEM_MAX_PAGES:2}
+      public-coupon-max: ${HM_AI_RAG_PUBLIC_COUPON_MAX:15}
 

@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: ai-assistant-service
+  profiles:
+    active: local
+
+  cloud:
+    nacos:
+      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:192.168.116.130:8848}
+      discovery:
+        # 本地未启动 Nacos 时可设为 false：NACOS_REGISTER_ENABLED=false
+        register-enabled: ${NACOS_REGISTER_ENABLED:true}
+      config:
+        # 当前项目其它微服务使用 bootstrap + shared-configs 方式加载 Nacos 配置
+        # 这里关闭 ConfigData 的 import 强校验，避免要求 spring.config.import
+        import-check:
+          enabled: false
+        file-extension: yaml
+        shared-configs:
+          - data-id: shared-jdbc.yaml
+          - data-id: shared-log.yaml
+          - data-id: shared-swagger.yaml

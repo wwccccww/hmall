@@ -50,6 +50,7 @@ docker compose up -d --build
 
 ## 3.1 AI 导购助手（用户态 RAG）
 
+- **回答逻辑与数据范围说明**：`ai-assistant-service/AI_ASSISTANT_LOGIC.md`（分流、RAG、工具、是否全量进上下文）
 - **文档**：`http://localhost:8090/doc.html`
 - **接口**：
   - `POST /ai/chat/sync`：同步返回
@@ -59,6 +60,10 @@ docker compose up -d --build
 
 1. 登录获取 JWT：`POST http://localhost:8080/users/login`
 2. 调用 AI（走网关）：`POST http://localhost:8080/ai/chat/sync`\n   - Header：`Authorization: Bearer <JWT>`\n   - Body：`{\"message\":\"我有哪些优惠券？\"}` 或 `{\"message\":\"订单 123456789 状态？\"}` 或 `{\"message\":\"推荐 2000 元左右手机\"}`
+
+### 配置百炼模型（推荐用根目录 `.env`）
+
+根目录 `.env` 已预置以下变量（把 `HM_AI_LLM_API_KEY` 换成你自己的 Key）：\n- `HM_AI_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode`\n- `HM_AI_LLM_MODEL=qwen-turbo-2025-07-15`\n\n启动（或重建）AI 服务：\n- `docker compose up -d --build ai-assistant-service`
 
 ## 4. 常见问题
 

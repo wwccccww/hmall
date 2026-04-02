@@ -1,6 +1,8 @@
 package com.hmall.ai.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmall.ai.llm.LlmClient;
+import com.hmall.ai.llm.LlmProperties;
 import com.hmall.ai.web.dto.ChatRequest;
 import com.hmall.ai.web.dto.ChatResponse;
 import com.hmall.ai.service.AiChatService;
@@ -15,6 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -26,6 +29,8 @@ import java.util.regex.Pattern;
 public class AiChatServiceImpl implements AiChatService {
 
     private final LlmClient llmClient;
+    private final LlmProperties llmProperties;
+    private final ObjectMapper objectMapper;
     private final SimpleRagService ragService;
     private final UserTools userTools;
 
@@ -53,7 +58,7 @@ public class AiChatServiceImpl implements AiChatService {
         if (tool != null) {
             try {
                 emitter.send(SseEmitter.event().name("result").data(tool));
-                emitter.send(SseEmitter.event().name("done").data(Map.of()));
+                emitter.send(SseEmitter.event().name("done").data((Object) Map.of("ok", true)));
             } catch (Exception e) {
                 emitter.completeWithError(e);
                 return emitter;
@@ -62,45 +67,54 @@ public class AiChatServiceImpl implements AiChatService {
             return emitter;
         }
         var rag = ragService.buildRagPrompt(request.getMessage());
-        llmClient.streamChat(rag.prompt())
-                .subscribe(
-                        chunk -> {
-                            try {
-                                emitter.send(SseEmitter.event()
-                                        .name("message")
-                                        .data(Map.of("delta", chunk)));
-                            } catch (IOException e) {
-                                log.warn("SSE send failed", e);
-                                emitter.completeWithError(e);
-                            }
-                        },
-                        err -> {
-                            try {
-                                emitter.send(SseEmitter.event().name("error").data(Map.of("message", err.getMessage())));
-                            } catch (Exception ignored) {
-                            }
-                            emitter.completeWithError(err);
-                        },
-                        () -> {
-                            try {
-                                emitter.send(SseEmitter.event().name("sources").data(Map.of("sources", rag.sources())));
-                                emitter.send(SseEmitter.event().name("done").data(Map.of()));
-                            } catch (Exception ignored) {
-                            }
-                            emitter.complete();
-                        }
-                );
+        CompletableFuture.runAsync(() -> {
+            try {
+                String answer = llmClient.chat(rag.prompt());
+                if (answer == null) {
+                    answer = "";
+                }
+                for (String chunk : splitToChunks(answer, 40)) {
+                    emitter.send(SseEmitter.event().name("message").data((Object) Map.of("delta", chunk)));
+                }
+                emitter.send(SseEmitter.event().name("sources").data((Object) Map.of("sources", rag.sources())));
+                emitter.send(SseEmitter.event().name("done").data((Object) Map.of("ok", true)));
+                emitter.complete();
+            } catch (Exception e) {
+                try {
+                    emitter.send(SseEmitter.event().name("error").data((Object) Map.of("message", String.valueOf(e.getMessage()))));
+                } catch (IOException ignored) {
+                }
+                emitter.completeWithError(e);
+            }
+        });
         return emitter;
     }
 
+    private List<String> splitToChunks(String text, int chunkSize) {
+        if (text == null || text.isEmpty()) {
+            return List.of();
+        }
+        int n = Math.max(1, chunkSize);
+        int len = text.length();
+        ArrayList<String> out = new ArrayList<>((len + n - 1) / n);
+        for (int i = 0; i < len; i += n) {
+            out.add(text.substring(i, Math.min(len, i + n)));
+        }
+        return out;
+    }
+
+    /**
+     * 工具路径：先查下游，再在配置了 API Key 时用 LLM 将结构化结果合成自然语言。
+     */
     private ChatResponse tryToolCall(String message) {
-        if (message == null) return null;
+        if (message == null) {
+            return null;
+        }
         String m = message.trim();
         Long userId = UserContext.getUser();
         boolean loggedIn = userId != null;
 
         List<Map<String, Object>> actions = new ArrayList<>();
-        List<Map<String, Object>> sources = new ArrayList<>();
 
         if (m.contains("我的优惠券") || m.contains("可用券") || m.contains("优惠券有哪些")) {
             if (!loggedIn) {
@@ -108,10 +122,12 @@ public class AiChatServiceImpl implements AiChatService {
             }
             actions.add(Map.of("tool", "queryMyCoupons"));
             List<Map<String, Object>> coupons = userTools.queryMyCoupons();
-            sources.add(Map.of("type", "coupon_list", "count", coupons.size()));
+            List<Map<String, Object>> sources = List.of(Map.of("type", "coupons", "data", coupons));
+            String fallback = "已为你查询到优惠券列表（见 sources）。你也可以告诉我你想买的商品/预算，我帮你挑最划算的券。";
+            String answer = synthesizeToolAnswer(message, sources, fallback);
             return ChatResponse.builder()
-                    .answer("已为你查询到优惠券列表（见 sources）。你也可以告诉我你想买的商品/预算，我帮你挑最划算的券。")
-                    .sources(List.of(Map.of("type", "coupons", "data", coupons)))
+                    .answer(answer)
+                    .sources(sources)
                     .actions(actions)
                     .build();
         }
@@ -122,9 +138,12 @@ public class AiChatServiceImpl implements AiChatService {
             }
             actions.add(Map.of("tool", "queryMyAddresses"));
             List<Map<String, Object>> addresses = userTools.queryMyAddresses();
+            List<Map<String, Object>> sources = List.of(Map.of("type", "addresses", "data", addresses));
+            String fallback = "已为你查询到地址列表（已脱敏，见 sources）。";
+            String answer = synthesizeToolAnswer(message, sources, fallback);
             return ChatResponse.builder()
-                    .answer("已为你查询到地址列表（已脱敏，见 sources）。")
-                    .sources(List.of(Map.of("type", "addresses", "data", addresses)))
+                    .answer(answer)
+                    .sources(sources)
                     .actions(actions)
                     .build();
         }
@@ -135,9 +154,12 @@ public class AiChatServiceImpl implements AiChatService {
             }
             actions.add(Map.of("tool", "queryMe"));
             Map<String, Object> me = userTools.queryMe();
+            List<Map<String, Object>> sources = List.of(Map.of("type", "me", "data", me));
+            String fallback = "已为你查询到当前登录信息（见 sources）。";
+            String answer = synthesizeToolAnswer(message, sources, fallback);
             return ChatResponse.builder()
-                    .answer("已为你查询到当前登录信息（见 sources）。")
-                    .sources(List.of(Map.of("type", "me", "data", me)))
+                    .answer(answer)
+                    .sources(sources)
                     .actions(actions)
                     .build();
         }
@@ -157,14 +179,35 @@ public class AiChatServiceImpl implements AiChatService {
             Long orderId = Long.valueOf(matcher.group(1));
             actions.add(Map.of("tool", "queryOrderById", "orderId", orderId));
             Map<String, Object> order = userTools.queryOrderById(orderId);
+            List<Map<String, Object>> sources = List.of(Map.of("type", "order", "data", order));
+            String fallback = "已为你查询订单信息（见 sources）。如需我帮你解读字段含义，也可以继续问我。";
+            String answer = synthesizeToolAnswer(message, sources, fallback);
             return ChatResponse.builder()
-                    .answer("已为你查询订单信息（见 sources）。如需我帮你解读字段含义，也可以继续问我。")
-                    .sources(List.of(Map.of("type", "order", "data", order)))
+                    .answer(answer)
+                    .sources(sources)
                     .actions(actions)
                     .build();
         }
 
         return null;
     }
-}
 
+    private String synthesizeToolAnswer(String userMessage, List<Map<String, Object>> sources, String fallback) {
+        String key = llmProperties.getApiKey();
+        if (key == null || key.isBlank()) {
+            return fallback;
+        }
+        try {
+            String json = objectMapper.writeValueAsString(sources);
+            String prompt = "用户问题：\n" + userMessage + "\n\n系统查询结果（JSON，仅可据此回答，勿编造字段）：\n"
+                    + json + "\n\n请用简洁中文直接回答；列表请做可读摘要；已脱敏字段（如 ***）请保持脱敏表述。";
+            String out = llmClient.chat(prompt);
+            if (out != null && !out.isBlank()) {
+                return out;
+            }
+        } catch (Exception e) {
+            log.warn("tool answer synthesis failed: {}", e.getMessage());
+        }
+        return fallback;
+    }
+}

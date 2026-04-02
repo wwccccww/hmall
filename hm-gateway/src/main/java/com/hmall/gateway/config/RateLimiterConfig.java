@@ -3,6 +3,7 @@ package com.hmall.gateway.config;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
@@ -19,6 +20,7 @@ public class RateLimiterConfig {
     private static final Pattern AI_CHAT_PATH = Pattern.compile("^/ai/(chat|chat/sync)$");
 
     @Bean
+    @Primary
     public KeyResolver couponReceiveKeyResolver() {
         return exchange -> {
             String path = exchange.getRequest().getURI().getPath(); // 获取请求路径
