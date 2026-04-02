@@ -11,6 +11,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,10 @@ public class SimpleRagService {
 
     @Value("${hm.ai.rag.prompt-max-items:12}")
     private int promptMaxItems;
+
+    /** 前端商城根 URL，用于生成可点击的绝对商品链接；留空则只下发相对路径 productPath */
+    @Value("${hm.ai.mall.front-base-url:${HM_AI_MALL_FRONT_BASE_URL:}}")
+    private String mallFrontBaseUrl;
 
     private static final int ITEM_PAGE_SIZE = 50;
 
@@ -91,7 +96,8 @@ public class SimpleRagService {
         prompt.append("- 输出结构：\n");
         prompt.append("  1) 结论（1-2 句话）\n");
         prompt.append("  2) 推荐清单（3-5 个，含：商品ID、名称、推荐理由、适合人群）；若无完全匹配，标题或首句注明「以下为替代选项/近似款」。\n");
-        prompt.append("  3) 购买建议（对比维度/避坑）；如上下文含可用券，可简要说明门槛与类型。\n\n");
+        prompt.append("  3) 购买建议（对比维度/避坑）；如上下文含可用券，可简要说明门槛与类型。\n");
+        prompt.append("  4) 结尾用一句话提醒：用户可在对话下方的商品卡片中「查看商品」或「加入购物车」。\n\n");
         prompt.append("【用户问题】\n").append(userMessage).append("\n\n");
         prompt.append("【候选商品信息】\n").append(itemContext.isEmpty() ? "（无）\n" : itemContext).append("\n");
         prompt.append("【公开进行中优惠券摘要】\n").append(couponContext.isEmpty() ? "（无）\n" : couponContext).append("\n");
@@ -182,6 +188,9 @@ public class SimpleRagService {
         m.put("category", node.path("category").asText(""));
         m.put("brand", node.path("brand").asText(""));
         m.put("spec", node.path("spec").asText(""));
+        if (node.hasNonNull("image")) {
+            m.put("image", node.path("image").asText(""));
+        }
         if (node.hasNonNull("specColor")) {
             m.put("specColor", node.path("specColor").asText(""));
         }
@@ -190,6 +199,7 @@ public class SimpleRagService {
         }
         enrichSpecJsonFields(m, node.path("spec").asText(""));
         m.put("source", "elasticsearch");
+        enrichPurchaseFields(m);
         return m;
     }
 
@@ -298,9 +308,55 @@ public class SimpleRagService {
         m.put("category", node.path("category").asText(""));
         m.put("brand", node.path("brand").asText(""));
         m.put("spec", node.path("spec").asText(""));
+        if (node.hasNonNull("image")) {
+            m.put("image", node.path("image").asText(""));
+        }
         enrichSpecJsonFields(m, node.path("spec").asText(""));
         m.put("source", "mysql_page");
+        enrichPurchaseFields(m);
         return m;
+    }
+
+    private void enrichPurchaseFields(Map<String, Object> m) {
+        Object idObj = m.get("id");
+        if (idObj == null) {
+            return;
+        }
+        long id = idObj instanceof Number ? ((Number) idObj).longValue() : Long.parseLong(String.valueOf(idObj));
+        m.put("productPath", "/product/" + id);
+        String base = normalizeMallFrontBase();
+        if (base != null && !base.isBlank()) {
+            m.put("productUrl", base + "/product/" + id);
+        }
+        int priceCents = 0;
+        Object p = m.get("price");
+        if (p instanceof Number) {
+            priceCents = ((Number) p).intValue();
+        }
+        String specStr = m.get("spec") == null ? "{}" : String.valueOf(m.get("spec"));
+        if (specStr.isBlank()) {
+            specStr = "{}";
+        }
+        Map<String, Object> cart = new LinkedHashMap<>();
+        cart.put("itemId", id);
+        cart.put("num", 1);
+        cart.put("name", String.valueOf(m.getOrDefault("name", "")));
+        cart.put("price", priceCents);
+        cart.put("image", String.valueOf(m.getOrDefault("image", "")));
+        cart.put("category", String.valueOf(m.getOrDefault("category", "")));
+        cart.put("spec", specStr);
+        m.put("addToCart", cart);
+    }
+
+    private String normalizeMallFrontBase() {
+        if (mallFrontBaseUrl == null) {
+            return null;
+        }
+        String s = mallFrontBaseUrl.trim();
+        while (s.endsWith("/")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s.isEmpty() ? null : s;
     }
 
     /** 与 ItemDoc 一致：把 {"颜色":...,"尺寸":...} 解析进 map，便于 prompt 展示 */

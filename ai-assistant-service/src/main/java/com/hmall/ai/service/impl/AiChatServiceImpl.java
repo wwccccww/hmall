@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -51,7 +53,7 @@ public class AiChatServiceImpl implements AiChatService {
         return ChatResponse.builder()
                 .answer(ga.answer)
                 .sources(ga.sources)
-                .actions(List.of())
+                .actions(buildShoppingActions(ga.sources))
                 .build();
     }
 
@@ -80,7 +82,10 @@ public class AiChatServiceImpl implements AiChatService {
                 for (String chunk : splitToChunks(answer, 40)) {
                     emitter.send(SseEmitter.event().name("message").data((Object) Map.of("delta", chunk)));
                 }
-                emitter.send(SseEmitter.event().name("sources").data((Object) Map.of("sources", ga.sources)));
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("sources", ga.sources);
+                meta.put("actions", buildShoppingActions(ga.sources));
+                emitter.send(SseEmitter.event().name("sources").data((Object) meta));
                 emitter.send(SseEmitter.event().name("done").data((Object) Map.of("ok", true)));
                 emitter.complete();
             } catch (Exception e) {
@@ -132,6 +137,41 @@ public class AiChatServiceImpl implements AiChatService {
                 "appId", String.valueOf(llmProperties.getBailianAppId()),
                 "note", "回答由百炼智能体生成；知识库检索在百炼侧完成（见控制台应用配置）"
         ));
+    }
+
+    /** 从 RAG 商品来源生成前端可渲染的「查看 / 加购」动作项 */
+    private List<Map<String, Object>> buildShoppingActions(List<Map<String, Object>> sources) {
+        if (sources == null || sources.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> s : sources) {
+            if (!"item".equals(String.valueOf(s.get("type")))) {
+                continue;
+            }
+            Object idObj = s.get("id");
+            if (idObj == null) {
+                continue;
+            }
+            long itemId = idObj instanceof Number ? ((Number) idObj).longValue() : Long.parseLong(String.valueOf(idObj));
+            Map<String, Object> action = new LinkedHashMap<>();
+            action.put("type", "shopping_item");
+            action.put("itemId", itemId);
+            action.put("name", s.get("name"));
+            action.put("productPath", s.get("productPath"));
+            Object pu = s.get("productUrl");
+            if (pu != null && !String.valueOf(pu).isBlank()) {
+                action.put("productUrl", pu);
+            }
+            Object rawCart = s.get("addToCart");
+            if (rawCart instanceof Map<?, ?> && !((Map<?, ?>) rawCart).isEmpty()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> cart = (Map<String, Object>) rawCart;
+                action.put("addToCart", cart);
+            }
+            out.add(action);
+        }
+        return out;
     }
 
     private static final class GeneralAnswer {

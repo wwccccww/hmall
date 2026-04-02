@@ -1,9 +1,13 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { aiChatStream, aiChatSync } from '@/api/ai'
+import { addCartItem } from '@/api/cart'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
+const router = useRouter()
+const route = useRoute()
 
 const open = ref(false)
 const sending = ref(false)
@@ -16,6 +20,35 @@ const messages = ref([
   }
 ])
 const sources = ref(null)
+/** 后端下发的购物动作；旧版无 actions 时由 sources 里 type=item 推导 */
+const shoppingActions = ref([])
+
+function deriveShoppingActions(srcList) {
+  if (!Array.isArray(srcList)) return []
+  return srcList
+    .filter((x) => x && x.type === 'item' && x.id != null && x.addToCart)
+    .map((x) => ({
+      type: 'shopping_item',
+      itemId: x.id,
+      name: x.name,
+      productPath: x.productPath || `/product/${x.id}`,
+      productUrl: x.productUrl,
+      addToCart: x.addToCart
+    }))
+}
+
+function applySourcesPayload(payload) {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload) && 'sources' in payload) {
+    sources.value = payload.sources
+    shoppingActions.value =
+      Array.isArray(payload.actions) && payload.actions.length > 0
+        ? payload.actions
+        : deriveShoppingActions(payload.sources)
+  } else {
+    sources.value = Array.isArray(payload) ? payload : null
+    shoppingActions.value = deriveShoppingActions(sources.value)
+  }
+}
 
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const title = computed(() => (isLoggedIn.value ? 'AI 导购（已登录）' : 'AI 导购（未登录）'))
@@ -37,6 +70,7 @@ async function send({ stream = true } = {}) {
   if (!text || sending.value) return
   input.value = ''
   sources.value = null
+  shoppingActions.value = []
 
   messages.value.push({ role: 'user', content: text })
   const assistantMsg = { role: 'assistant', content: '' }
@@ -52,7 +86,7 @@ async function send({ stream = true } = {}) {
           scrollToBottom()
         },
         onSources: (s) => {
-          sources.value = s
+          applySourcesPayload(s)
         },
         onError: (e) => {
           assistantMsg.content += `\n\n[错误] ${e?.message || e}`
@@ -61,11 +95,38 @@ async function send({ stream = true } = {}) {
     } else {
       const resp = await aiChatSync(text)
       assistantMsg.content = resp?.answer || ''
-      sources.value = resp?.sources || null
+      applySourcesPayload(
+        resp?.actions != null
+          ? { sources: resp?.sources || [], actions: resp.actions }
+          : resp?.sources || null
+      )
     }
   } finally {
     sending.value = false
     await scrollToBottom()
+  }
+}
+
+function openAiProduct(action) {
+  const path = action.productPath || `/product/${action.itemId}`
+  router.push(path)
+}
+
+async function addAiItemToCart(action) {
+  const body = action.addToCart
+  if (!body) return
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  try {
+    await addCartItem(body)
+    router.push('/cart')
+  } catch (e) {
+    if (e.response?.status === 401) {
+      userStore.clearUserInfo()
+      router.push({ path: '/login', query: { redirect: route.fullPath } })
+    }
   }
 }
 </script>
@@ -105,8 +166,35 @@ async function send({ stream = true } = {}) {
           </div>
         </div>
 
+        <div v-if="shoppingActions.length" class="space-y-2">
+          <div class="text-xs font-semibold text-gray-700">推荐商品（可跳转或加购）</div>
+          <div
+            v-for="(a, i) in shoppingActions"
+            :key="`${a.itemId}-${i}`"
+            class="text-xs bg-white border border-gray-200 rounded-xl p-3 flex flex-col gap-2"
+          >
+            <div class="font-medium text-gray-900 line-clamp-2">{{ a.name || `商品 #${a.itemId}` }}</div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="px-2 py-1 rounded-lg bg-white border border-gray-300 text-gray-800 hover:bg-gray-50"
+                @click="openAiProduct(a)"
+              >
+                查看商品
+              </button>
+              <button
+                type="button"
+                class="px-2 py-1 rounded-lg bg-black text-white hover:bg-gray-900"
+                @click="addAiItemToCart(a)"
+              >
+                加入购物车
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="sources" class="text-xs text-gray-600 bg-white border border-gray-200 rounded-xl p-3">
-          <div class="font-semibold text-gray-800 mb-2">sources</div>
+          <div class="font-semibold text-gray-800 mb-2">sources（调试）</div>
           <pre class="whitespace-pre-wrap break-words">{{ JSON.stringify(sources, null, 2) }}</pre>
         </div>
       </div>

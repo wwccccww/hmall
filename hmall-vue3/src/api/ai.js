@@ -75,7 +75,10 @@ function handleSseEvent(rawEvent, { onDelta, onSources, onDone }) {
     const delta = payload?.delta ?? ''
     if (delta) onDelta?.(delta)
   } else if (eventName === 'sources') {
-    onSources?.(payload?.sources || payload)
+    // 后端可能下发 { sources, actions }；兼容旧版仅 sources 数组
+    const src = payload?.sources ?? payload
+    const act = payload?.actions
+    onSources?.(act != null ? { sources: src, actions: act } : src)
   } else if (eventName === 'done') {
     onDone?.()
   }
