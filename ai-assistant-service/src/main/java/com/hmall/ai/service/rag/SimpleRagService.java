@@ -21,6 +21,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SimpleRagService {
 
+    private final ShoppingIntentParseService shoppingIntentParseService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -56,10 +58,13 @@ public class SimpleRagService {
     @Value("${hm.ai.mall.front-base-url:${HM_AI_MALL_FRONT_BASE_URL:}}")
     private String mallFrontBaseUrl;
 
+    /** 商品分页大小 */
     private static final int ITEM_PAGE_SIZE = 50;
 
     /**
      * 从 ES（/search/list）优先召回商品，失败或无结果时回退 /items/page；附带公开券摘要。
+     * @param userMessage 用户问题
+     * @return RAG 结果
      */
     public RagResult buildRagPrompt(String userMessage) {
         List<Map<String, Object>> sources = new ArrayList<>();
@@ -105,6 +110,12 @@ public class SimpleRagService {
         return new RagResult(prompt.toString(), sources);
     }
 
+    /**
+     * 从 ES（/search/list）优先召回商品，失败或无结果时回退 /items/page。
+     * @param userMessage 用户关键词
+     * @return 商品卡片列表
+     * @throws Exception 调用 ES 或 item-service 失败
+     */
     private List<Map<String, Object>> fetchItemCandidates(String userMessage) throws Exception {
         if (useElasticsearch) {
             try {
@@ -134,7 +145,7 @@ public class SimpleRagService {
     private List<Map<String, Object>> fetchFromElasticsearch(String userMessage) throws Exception {
         String baseUrl = itemBaseUrl == null ? "http://item-service:8081" : itemBaseUrl;
         WebClient webClient = WebClient.builder().baseUrl(baseUrl).build();
-        ShoppingIntentParser.Parsed parsed = ShoppingIntentParser.parse(userMessage);
+        ShoppingIntentParser.Parsed parsed = shoppingIntentParseService.parse(userMessage);
 
         int size = Math.max(5, Math.min(searchTopK, 50));
         String json = webClient.get()
@@ -153,6 +164,7 @@ public class SimpleRagService {
                     if (parsed.getCategory() != null && !parsed.getCategory().isBlank()) {
                         b.queryParam("category", parsed.getCategory());
                     }
+                    //TODO 如果只有最大值或者最小值，也加入条件筛选
                     if (parsed.hasPriceBand()) {
                         b.queryParam("minPrice", parsed.getMinPrice());
                         b.queryParam("maxPrice", parsed.getMaxPrice());
@@ -179,6 +191,11 @@ public class SimpleRagService {
         return out;
     }
 
+    /**
+     * 将 ES 搜索结果转换为商品卡片格式
+     * @param node ES 搜索结果节点
+     * @return 商品卡片
+     */
     private Map<String, Object> fromSearchHitToItemSource(JsonNode node) {
         Map<String, Object> m = new HashMap<>();
         m.put("type", "item");
@@ -197,12 +214,19 @@ public class SimpleRagService {
         if (node.hasNonNull("specSize")) {
             m.put("specSize", node.path("specSize").asText(""));
         }
+        // 填充 spec 字段的 JSON 字段
         enrichSpecJsonFields(m, node.path("spec").asText(""));
         m.put("source", "elasticsearch");
+        // 填充购买字段
         enrichPurchaseFields(m);
         return m;
     }
 
+    /**
+     * 从 item-service 获取商品卡片
+     * @param userMessage 用户关键词
+     * @return 商品卡片列表
+     */
     private List<Map<String, Object>> fetchCandidatesFromItemService(String userMessage) throws Exception {
         String baseUrl = itemBaseUrl == null ? "http://item-service:8081" : itemBaseUrl;
         WebClient webClient = WebClient.builder().baseUrl(baseUrl).build();
@@ -253,6 +277,11 @@ public class SimpleRagService {
         return out.isEmpty() ? firstN : out;
     }
 
+    /**
+     * 从 promotion-service 获取公开优惠券
+     * @return 公开优惠券列表
+     * @throws Exception 从 promotion-service 获取公开优惠券失败
+     */
     private List<Map<String, Object>> fetchPublicCoupons() throws Exception {
         String base = promotionBaseUrl == null ? "http://promotion-service:8087" : promotionBaseUrl;
         WebClient webClient = WebClient.builder().baseUrl(base).build();
@@ -281,6 +310,11 @@ public class SimpleRagService {
         return list;
     }
 
+    /**
+     * 将 promotion-service 优惠券节点转换为 RAG 商品卡片
+     * @param node 优惠券节点
+     * @return 优惠券卡片
+     */
     private Map<String, Object> toPublicCouponSource(JsonNode node) {
         Map<String, Object> m = new HashMap<>();
         m.put("type", "public_coupon");
@@ -299,6 +333,12 @@ public class SimpleRagService {
         return m;
     }
 
+    /**
+     * 将 item-service 商品节点转换为 RAG 商品卡片
+     * @param node 商品节点
+     * @param name 商品名称
+     * @return 商品卡片
+     */
     private Map<String, Object> toItemSourceFromPage(JsonNode node, String name) {
         Map<String, Object> m = new HashMap<>();
         m.put("type", "item");
@@ -317,6 +357,10 @@ public class SimpleRagService {
         return m;
     }
 
+    /**
+     * 填充购买字段
+     * @param m 商品卡片
+     */
     private void enrichPurchaseFields(Map<String, Object> m) {
         Object idObj = m.get("id");
         if (idObj == null) {
@@ -348,6 +392,10 @@ public class SimpleRagService {
         m.put("addToCart", cart);
     }
 
+    /**
+     * 规范商城前端基础 URL
+     * @return 规范后的商城前端基础 URL
+     */
     private String normalizeMallFrontBase() {
         if (mallFrontBaseUrl == null) {
             return null;
@@ -376,6 +424,11 @@ public class SimpleRagService {
         }
     }
 
+    /**
+     * 构建商品卡片上下文文本
+     * @param items 商品卡片列表
+     * @return 上下文文本
+     */
     private String buildItemContextText(List<Map<String, Object>> items) {
         StringBuilder sb = new StringBuilder();
         for (Map<String, Object> it : items) {
@@ -392,6 +445,11 @@ public class SimpleRagService {
         return sb.toString();
     }
 
+    /**
+     * 构建优惠券卡片上下文文本
+     * @param coupons 优惠券卡片列表
+     * @return 上下文文本
+     */
     private String buildCouponContextText(List<Map<String, Object>> coupons) {
         StringBuilder sb = new StringBuilder();
         for (Map<String, Object> c : coupons) {
@@ -409,6 +467,13 @@ public class SimpleRagService {
         return sb.toString();
     }
 
+    /**
+     * 规范用户关键词
+     * @param userMessage 用户关键词原始文本
+     * @return 规范后的关键词文本
+     */
+    //TODO 规范关键词，例如去停用词、去标点符号等
+    // 这里简单地去停用词、去标点符号、取前12个字符
     private String normalizeKeyword(String userMessage) {
         if (userMessage == null) {
             return "";
@@ -420,6 +485,7 @@ public class SimpleRagService {
         return s;
     }
 
+    /** RAG 结果 */
     public static class RagResult {
         private final String prompt;
         private final List<Map<String, Object>> sources;

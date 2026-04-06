@@ -70,6 +70,7 @@ public final class ShoppingIntentParser {
             }
         }
 
+        // 品牌提示
         String lower = text.toLowerCase();
         for (Map.Entry<String, String> e : BRAND_HINTS.entrySet()) {
             if (text.contains(e.getKey()) || lower.contains(e.getKey().toLowerCase())) {
@@ -82,6 +83,12 @@ public final class ShoppingIntentParser {
         return p;
     }
 
+    /**
+     * 生成价格范围
+     * @param p 解析结果
+     * @param centerYuan 中心价格（元）
+     * @param ratio 价格范围比例
+     */
     private static void bandAroundYuan(Parsed p, double centerYuan, double ratio) {
         double lo = Math.max(0, centerYuan * (1 - ratio));
         double hi = centerYuan * (1 + ratio);

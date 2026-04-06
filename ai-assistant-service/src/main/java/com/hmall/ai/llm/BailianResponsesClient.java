@@ -26,13 +26,21 @@ public class BailianResponsesClient {
     private final LlmProperties props;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 是否启用百炼智能体 Responses API。
+     * @return 是否启用
+     */
     public boolean enabled() {
         String id = props.getBailianAppId();
         return id != null && !id.isBlank();
     }
 
+
     /**
+     * 调用百炼智能体 Responses API，返回输出文本。
      * 同步调用，解析 output[].content[] 中 type=output_text 的文本。
+     * @param userInput 用户输入
+     * @return 输出文本
      */
     public String complete(String userInput) {
         if (!enabled()) {
@@ -54,9 +62,14 @@ public class BailianResponsesClient {
                 .bodyToMono(String.class)
                 .timeout(Duration.ofMillis(props.getTimeoutMs()))
                 .block();
+        log.info("Bailian Responses API response: {}", json);
         return extractOutputText(json);
     }
 
+    /**
+     * 获取百炼智能体 Responses API 基础 URL。
+     * @return Responses API 基础 URL
+     */
     private String bailianOrigin() {
         String base = props.getBailianEndpointBase();
         if (base == null || base.isBlank()) {
@@ -65,11 +78,20 @@ public class BailianResponsesClient {
         return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
     }
 
+    /**
+     * 获取百炼智能体 Responses API 路径。
+     * @return Responses API 路径
+     */
     private String responsesPath() {
         String appId = props.getBailianAppId().trim();
         return "/api/v2/apps/agent/" + appId + "/compatible-mode/v1/responses";
     }
 
+    /**
+     * 从 JSON 字符串中提取 output[].content[] 中 type=output_text 的文本。
+     * @param json 输入 JSON 字符串
+     * @return 输出文本字符串
+     */
     private String extractOutputText(String json) {
         if (json == null || json.isBlank()) {
             return "";
@@ -99,6 +121,11 @@ public class BailianResponsesClient {
         }
     }
 
+    /**
+     * 将 null 转换为空字符串。
+     * @param s 输入字符串
+     * @return 输出字符串，空字符串或 null 时返回空字符串
+     */
     private static String nullToEmpty(String s) {
         return s == null ? "" : s;
     }

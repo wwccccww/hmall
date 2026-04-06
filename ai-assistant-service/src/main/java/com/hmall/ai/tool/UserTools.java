@@ -27,9 +27,9 @@ public class UserTools {
                 .uri("http://user-service:8084/users/me")
                 .header("user-info", String.valueOf(userId))
                 .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
+                .retrieve()// 执行请求
+                .bodyToMono(Map.class)// 转换为 Map 类型
+                .block();// 阻塞等待响应
         if (resp == null) return Map.of();
         return Map.of(
                 "userId", resp.get("userId"),
