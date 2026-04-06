@@ -39,7 +39,7 @@ knife4j:
   enable: true
   openapi:
     title: 促销服务接口文档
-    description: "黑马商城促销（优惠券秒杀）接口文档"
+    description: "云汇智选促销（优惠券秒杀）接口文档"
     version: v1.0.0
     group:
       default:

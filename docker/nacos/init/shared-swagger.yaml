@@ -1,8 +1,8 @@
 knife4j:
   enable: true
   openapi:
-    title: ${hm.swagger.title:黑马商城接口文档}
-    description: ${hm.swagger.description:"黑马商城接口文档"}
+    title: ${hm.swagger.title:云汇智选接口文档}
+    description: ${hm.swagger.description:"云汇智选接口文档"}
     version: v1.0.0
     group:
       default:

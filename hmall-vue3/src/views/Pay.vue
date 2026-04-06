@@ -37,7 +37,7 @@ onMounted(async () => {
           bizOrderNo: finalOrderId,
           amount: finalFee,
           payType: 5,
-          orderInfo: '黑马商城商品',
+          orderInfo: '云汇智选商品',
           payChannelCode: 'balance'
         })
         payOrderNo.value = pno
