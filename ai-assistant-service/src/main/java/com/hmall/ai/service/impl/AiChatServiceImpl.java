@@ -158,17 +158,23 @@ public class AiChatServiceImpl implements AiChatService {
      * @return 通用回答
      */
     private GeneralAnswer resolveGeneralAnswer(String message) {
+        String localRagReason = null;
         if (bailianResponsesClient.enabled()) {
             try {
                 String answer = bailianResponsesClient.complete(BAILIAN_INPUT_PREFIX + message);
                 if (answer != null && !answer.isBlank()) {
+                    log.info("通用导购 channel=bailian_responses appId={}", llmProperties.getBailianAppId());
                     return new GeneralAnswer(answer, bailianSourceMeta());
                 }
+                localRagReason = "bailian_empty_output";
             } catch (Exception e) {
                 log.warn("Bailian Responses 调用失败，回退本地 RAG: {}", e.getMessage());
+                localRagReason = "bailian_error";
             }
+        } else {
+            localRagReason = "bailian_disabled";
         }
-        // 回退本地 RAG
+        log.info("通用导购 channel=local_rag reason={}", localRagReason != null ? localRagReason : "unknown");
         var rag = ragService.buildRagPrompt(message);
         String answer = llmClient.chat(rag.prompt());
         return new GeneralAnswer(answer == null ? "" : answer, rag.sources());
@@ -262,6 +268,7 @@ public class AiChatServiceImpl implements AiChatService {
             if (!loggedIn) {
                 return ChatResponse.builder().answer("请先登录后再查询“我的优惠券”。").sources(List.of()).actions(List.of()).build();
             }
+            log.info("导购路径 channel=tool tool=queryMyCoupons");
             actions.add(Map.of("tool", "queryMyCoupons"));
             List<Map<String, Object>> coupons = userTools.queryMyCoupons();
             List<Map<String, Object>> sources = List.of(Map.of("type", "coupons", "data", coupons));
@@ -280,6 +287,7 @@ public class AiChatServiceImpl implements AiChatService {
             if (!loggedIn) {
                 return ChatResponse.builder().answer("请先登录后再查询“我的地址”。").sources(List.of()).actions(List.of()).build();
             }
+            log.info("导购路径 channel=tool tool=queryMyAddresses");
             actions.add(Map.of("tool", "queryMyAddresses"));
             List<Map<String, Object>> addresses = userTools.queryMyAddresses();
             List<Map<String, Object>> sources = List.of(Map.of("type", "addresses", "data", addresses));
@@ -298,6 +306,7 @@ public class AiChatServiceImpl implements AiChatService {
             if (!loggedIn) {
                 return ChatResponse.builder().answer("请先登录后再查询“我的信息”。").sources(List.of()).actions(List.of()).build();
             }
+            log.info("导购路径 channel=tool tool=queryMe");
             actions.add(Map.of("tool", "queryMe"));
             Map<String, Object> me = userTools.queryMe();
             List<Map<String, Object>> sources = List.of(Map.of("type", "me", "data", me));
@@ -326,6 +335,7 @@ public class AiChatServiceImpl implements AiChatService {
             }
 
             Long orderId = Long.valueOf(matcher.group(1));
+            log.info("导购路径 channel=tool tool=queryOrderById orderId={}", orderId);
             actions.add(Map.of("tool", "queryOrderById", "orderId", orderId));
             Map<String, Object> order = userTools.queryOrderById(orderId);
             List<Map<String, Object>> sources = List.of(Map.of("type", "order", "data", order));
