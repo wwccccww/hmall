@@ -1,14 +1,25 @@
-# Seata 客户端（AT 模式）共享配置，参与全局事务的服务需引入此 data-id。
-# 默认 TC 地址为虚拟机（与同仓库 Nacos/MySQL 等一致）：192.168.116.130:8091
-# 若 TC 部署在其它机器，可设置环境变量 SEATA_SERVER_ADDR 覆盖，例如：SEATA_SERVER_ADDR=192.168.1.10:8091
+# Seata 客户端配置（与 TC 通过 Nacos 发现对齐）。
+# 1）TC（seata-server）须已注册到 Nacos，application 名与下方 registry.nacos.application 一致。
+# 2）tx-service-group 与 vgroup-mapping 的 key 须一致（此处为 hmall）。
+# 3）data-source-proxy-mode: XA 为强一致 XA 分支；若驱动/连接池报 XA 相关错误，可改为 AT（并保留 hm-item/hm-trade 的 undo_log 表）。
 seata:
   enabled: true
   application-id: ${spring.application.name}
-  tx-service-group: hmall_tx_group
+  tx-service-group: hmall
   enable-auto-data-source-proxy: true
-  data-source-proxy-mode: AT
+  data-source-proxy-mode: XA
+  # 客户端从哪读 Seata 服务端侧「全局配置」：未单独接 Nacos-Seata 配置中心时用 file 即可
+  config:
+    type: file
+  registry:
+    type: nacos
+    nacos:
+      server-addr: 192.168.116.130:8848
+      namespace: ""
+      group: DEFAULT_GROUP
+      application: seata-server
+      username: nacos
+      password: nacos
   service:
     vgroup-mapping:
-      hmall_tx_group: default
-    grouplist:
-      default: ${SEATA_SERVER_ADDR:192.168.116.130:8091}
+      hmall: default

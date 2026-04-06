@@ -1,3 +1,4 @@
+# 若 Nacos 中 jdbc URL 使用 ${hm.db.database}，需在对应服务的配置里声明库名（如 item：hm-item），见各服务 application.yaml 的 hm.db.database。
 hm:
   db:
     host: mysql

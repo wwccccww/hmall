@@ -1,12 +1,9 @@
 server:
   port: 8084
 
-#hm:
-#  swagger:
-#    title: "用户服务接口文档"
-#    package: com.hmall.user.controller
-#  db:
-#    database: hm-user
+hm:
+  db:
+    database: hm-user
 
 spring:
   application:

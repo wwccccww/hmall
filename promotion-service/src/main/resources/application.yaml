@@ -1,6 +1,10 @@
 server:
   port: 8087
 
+hm:
+  db:
+    database: hm-promotion
+
 spring:
   application:
     name: promotion-service

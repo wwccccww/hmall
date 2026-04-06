@@ -57,6 +57,8 @@ knife4j:
         api-rule-resources:
           - com.hmall.pay.controller
 hm:
+  db:
+    database: hm-pay
   jwt:
     location: classpath:hmall.jks
     alias: hmall

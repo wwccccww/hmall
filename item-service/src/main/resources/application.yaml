@@ -47,6 +47,8 @@ knife4j:
         api-rule-resources:
           - com.hmall.item.controller
 hm:
+  db:
+    database: hm-item
   jwt:
     location: classpath:hmall.jks
     alias: hmall

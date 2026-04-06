@@ -131,8 +131,6 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
-      # Seata TC 在虚拟机 192.168.116.130；与其它地址不一致时设 SEATA_SERVER_ADDR
-      SEATA_SERVER_ADDR: ${SEATA_SERVER_ADDR:-192.168.116.130:8091}
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -208,8 +206,6 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
-      # Seata TC 在虚拟机 192.168.116.130；与其它地址不一致时设 SEATA_SERVER_ADDR
-      SEATA_SERVER_ADDR: ${SEATA_SERVER_ADDR:-192.168.116.130:8091}
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
