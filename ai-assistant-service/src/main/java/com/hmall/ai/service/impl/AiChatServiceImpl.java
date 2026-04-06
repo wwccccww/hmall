@@ -7,6 +7,7 @@ import com.hmall.ai.llm.LlmProperties;
 import com.hmall.ai.web.dto.ChatRequest;
 import com.hmall.ai.web.dto.ChatResponse;
 import com.hmall.ai.service.AiChatService;
+import com.hmall.ai.service.rag.ShoppingIntentParser;
 import com.hmall.ai.service.rag.SimpleRagService;
 import com.hmall.ai.tool.UserTools;
 import com.hmall.common.utils.UserContext;
@@ -160,7 +161,8 @@ public class AiChatServiceImpl implements AiChatService {
      */
     private GeneralAnswer resolveGeneralAnswer(String message) {
         String localRagReason = null;
-        if (bailianResponsesClient.enabled()) {
+        boolean preferLocalItems = ShoppingIntentParser.prefersElasticsearchItemSearch(message);
+        if (bailianResponsesClient.enabled() && !preferLocalItems) {
             try {
                 String answer = bailianResponsesClient.complete(BAILIAN_INPUT_PREFIX + message);
                 if (answer != null && !answer.isBlank()) {
@@ -172,6 +174,9 @@ public class AiChatServiceImpl implements AiChatService {
                 log.warn("Bailian Responses 调用失败，回退本地 RAG: {}", e.getMessage());
                 localRagReason = "bailian_error";
             }
+        } else if (bailianResponsesClient.enabled() && preferLocalItems) {
+            localRagReason = "skip_bailian_structured_item_query";
+            log.info("通用导购跳过百炼，走本地 ES 商品检索（颜色/价/品牌/鞋或手机等结构化问法）");
         } else {
             localRagReason = "bailian_disabled";
         }

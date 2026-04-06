@@ -36,10 +36,12 @@ hm:
     rag:
       item-base-url: ${HM_AI_ITEM_BASE_URL:http://item-service:8081}
       promotion-base-url: ${HM_AI_PROMOTION_BASE_URL:http://promotion-service:8087}
-      item-max-pages: ${HM_AI_RAG_ITEM_MAX_PAGES:2}
-      public-coupon-max: ${HM_AI_RAG_PUBLIC_COUPON_MAX:15}
+      # true 且已配置 hm.ai.llm.api-key：商品检索前用 LLM 抽取价格/类目/品牌/颜色/尺寸，与规则解析合并
+      llm-intent-enabled: ${HM_AI_RAG_LLM_INTENT_ENABLED:false}
       # 导购优先走 item-service GET /search/list（Elasticsearch）；false 则仅用 /items/page
       use-elasticsearch: ${HM_AI_RAG_USE_ES:true}
+      item-max-pages: ${HM_AI_RAG_ITEM_MAX_PAGES:2}
+      public-coupon-max: ${HM_AI_RAG_PUBLIC_COUPON_MAX:15}
       # ES 召回条数（写入 prompt 时会再截断，控制 token）
       search-top-k: ${HM_AI_RAG_SEARCH_TOP_K:20}
       prompt-max-items: ${HM_AI_RAG_PROMPT_MAX_ITEMS:12}

@@ -1,8 +1,8 @@
 package com.hmall.item.controller;
 
-
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.hmall.common.catalog.ItemCategoryCatalog;
 import com.hmall.common.domain.PageDTO;
 import com.hmall.item.domain.dto.ItemDTO;
 import com.hmall.item.domain.query.ItemPageQuery;
@@ -17,7 +17,6 @@ import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.Operator;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -30,8 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-@CrossOrigin(origins = "*") // 允许所有来源调用
-@Api(tags = "搜索相关接口")
+
+@CrossOrigin(origins = "*")
+@Api(tags = "\u5546\u54c1\u641c\u7d22")
 @RestController
 @RequestMapping("/search")
 @RequiredArgsConstructor
@@ -40,104 +40,102 @@ public class SearchController {
 
     private final RestHighLevelClient client;
 
-    @ApiOperation("搜索商品")
+    @ApiOperation("\u5546\u54c1\u641c\u7d22")
     @GetMapping("/list")
     public PageDTO<ItemDTO> search(ItemPageQuery query) {
         try {
-            log.info("搜索商品，查询条件：{}", JSONUtil.toJsonStr(query));
+            log.info("\u5546\u54c1\u641c\u7d22\u6761\u4ef6\uff1a{}", JSONUtil.toJsonStr(query));
             SearchResponse response = doSearchOnce(query, query.getKey());
 
-            // 若用户输入是自然语言（含颜色/颜值等软偏好词），用严格匹配容易 0 命中；这里做一次“降级重试”
             if (isEmpty(response) && StrUtil.isNotBlank(query.getKey())) {
                 String degraded = degradeKeyword(query.getKey());
                 if (StrUtil.isNotBlank(degraded) && !degraded.equals(query.getKey())) {
-                    log.info("搜索结果为空，降级重试：originKey='{}', degradedKey='{}'", query.getKey(), degraded);
+                    log.info("\u641c\u7d22\u65e0\u7ed3\u679c\uff0c\u964d\u7ea7\u5173\u952e\u8bcd\uff1aoriginKey='{}', degradedKey='{}'", query.getKey(), degraded);
                     response = doSearchOnce(query, degraded);
                 }
             }
-            // 类目存的是「智能手机」等，整词不可能 term 命中「手机」；最后再缩 key 试一次
-            if (isEmpty(response) && StrUtil.isNotBlank(query.getKey()) && query.getKey().contains("手机")) {
-                log.info("搜索结果仍为空，使用极简关键词重试：key='手机'");
-                response = doSearchOnce(query, "手机");
+            if (isEmpty(response) && StrUtil.isNotBlank(query.getKey()) && query.getKey().contains("\u66f2\u9762\u7535\u89c6")) {
+                log.info("\u641c\u7d22\u65e0\u7ed3\u679c\uff0c\u66f2\u9762\u7535\u89c6\u5bbd\u677e\u4e3a\uff1akey='\u7535\u89c6'");
+                response = doSearchOnce(query, "\u7535\u89c6");
+            }
+            if (isEmpty(response) && StrUtil.isNotBlank(query.getKey())
+                    && (query.getKey().contains("\u978b") || query.getKey().contains("\u9774"))
+                    && StrUtil.isBlank(query.getCategory())) {
+                String shoeKey = query.getKey().contains("\u9774") ? "\u9774" : "\u978b";
+                log.info("\u641c\u7d22\u65e0\u7ed3\u679c\uff0c\u978b\u7c7b\u515a\u5e95\uff1akey='{}'", shoeKey);
+                response = doSearchOnce(query, shoeKey);
             }
 
-            // 4.解析响应
             SearchHits hits = response.getHits();
-            // 4.1.获取总条数
             long total = 0;
             if (hits.getTotalHits() != null) {
                 total = hits.getTotalHits().value;
             }
-            // 4.2.获取页面数据
             SearchHit[] searchHits = hits.getHits();
             List<ItemDTO> list = new ArrayList<>(searchHits.length);
             for (SearchHit hit : searchHits) {
-                // 获取 source
                 String json = hit.getSourceAsString();
-                // 反序列化
                 ItemDTO item = JSONUtil.toBean(json, ItemDTO.class);
                 list.add(item);
             }
 
             return new PageDTO<>(total, (total + query.getPageSize() - 1) / query.getPageSize(), list);
         } catch (IOException e) {
-            throw new RuntimeException("Elasticsearch 搜索失败", e);
+            throw new RuntimeException("Elasticsearch \u67e5\u8be2\u5931\u8d25", e);
         }
     }
 
     private SearchResponse doSearchOnce(ItemPageQuery query, String key) throws IOException {
-        // 1.准备Request
         SearchRequest request = new SearchRequest("items");
-        // 2.准备请求参数
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
 
-        // 2.1.构建查询条件（宽召回 + 软偏好加分）
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
 
         if (StrUtil.isNotBlank(key)) {
-            // 过去用 AND 会导致自然语言描述（多词）经常 0 命中；改为 OR，并用 should 召回更多候选
-            MatchQueryBuilder allMatch = QueryBuilders.matchQuery("all", key).operator(Operator.OR);
-            boolQuery.should(allMatch);
+            boolQuery.should(QueryBuilders.matchQuery("all", key).operator(Operator.OR));
             boolQuery.should(QueryBuilders.matchQuery("name", key).operator(Operator.OR).boost(2.0f));
             boolQuery.should(QueryBuilders.matchQuery("spec", key).operator(Operator.OR).boost(1.8f));
             boolQuery.should(QueryBuilders.matchQuery("specColor", key).operator(Operator.OR).boost(2.3f));
             boolQuery.should(QueryBuilders.matchQuery("specSize", key).operator(Operator.OR).boost(1.0f));
             boolQuery.should(QueryBuilders.matchQuery("brand", key).operator(Operator.OR).boost(1.2f));
             boolQuery.should(QueryBuilders.matchQuery("category", key).operator(Operator.OR).boost(1.2f));
-
-            // category 为 keyword 时，term「手机」命不中「智能手机」；用 wildcard 做子串匹配
-            if (key.contains("手机") && StrUtil.isBlank(query.getCategory())) {
-                boolQuery.should(QueryBuilders.wildcardQuery("category", "*手机*").caseInsensitive(true).boost(2.5f));
+            String colorKw = ItemCategoryCatalog.inferColorKeyword(key);
+            if (StrUtil.isNotBlank(colorKw)) {
+                boolQuery.should(QueryBuilders.matchQuery("name", colorKw).operator(Operator.OR).boost(4.0f));
+                boolQuery.should(QueryBuilders.matchQuery("specColor", colorKw).operator(Operator.OR).boost(3.5f));
             }
             boolQuery.minimumShouldMatch(1);
         } else {
             boolQuery.must(QueryBuilders.matchAllQuery());
         }
 
-        // 默认仅上架（与同步 ES 的 status=1 一致）；显式传 status 可查其它状态
         int statusFilter = query.getStatus() != null ? query.getStatus() : 1;
         boolQuery.filter(QueryBuilders.termQuery("status", statusFilter));
 
-        // 品牌过滤
         if (StrUtil.isNotBlank(query.getBrand())) {
             boolQuery.filter(QueryBuilders.termQuery("brand", query.getBrand()));
         }
-        // 分类过滤
         if (StrUtil.isNotBlank(query.getCategory())) {
             boolQuery.filter(QueryBuilders.termQuery("category", query.getCategory()));
+        } else {
+            applyCategoryIntentFilters(boolQuery, key);
         }
-        // 价格范围过滤
         if (query.getMinPrice() != null && query.getMaxPrice() != null) {
-            boolQuery.filter(QueryBuilders.rangeQuery("price").gte(query.getMinPrice()).lte(query.getMaxPrice()));
+            boolQuery.filter(
+                    QueryBuilders.rangeQuery("price").gte(query.getMinPrice()).lte(query.getMaxPrice()));
+        }
+        if (StrUtil.isNotBlank(query.getSpecColor())) {
+            boolQuery.filter(QueryBuilders.matchQuery("specColor", query.getSpecColor()).operator(Operator.OR));
+        }
+        if (StrUtil.isNotBlank(query.getSpecSize())) {
+            boolQuery.filter(QueryBuilders.matchQuery("specSize", query.getSpecSize()).operator(Operator.OR));
         }
 
         sourceBuilder.query(boolQuery);
 
-        // 2.2.分页
         sourceBuilder.from(query.from());
         sourceBuilder.size(query.getPageSize());
 
-        // 2.3.排序
         if (StrUtil.isNotBlank(query.getSortBy())) {
             sourceBuilder.sort(query.getSortBy(), query.getIsAsc() ? SortOrder.ASC : SortOrder.DESC);
         } else {
@@ -148,6 +146,19 @@ public class SearchController {
         return client.search(request, RequestOptions.DEFAULT);
     }
 
+    /**
+     * \u672a\u6307\u5b9a\u7cbe\u786e category \u65f6\uff0c\u7528\u4e0e\u5e93\u8868\u4e00\u81f4\u7684\u7c7b\u76ee\u767d\u540d\u5355\u505a {@code term} \u8fc7\u6ee4\uff08 keyword \u5b57\u6bb5\u4e0a\u6bd4 wildcard \u66f4\u7a33\uff09\u3002
+     */
+    private static void applyCategoryIntentFilters(BoolQueryBuilder boolQuery, String key) {
+        if (StrUtil.isBlank(key)) {
+            return;
+        }
+        String cat = ItemCategoryCatalog.inferCategoryFromUserText(key);
+        if (StrUtil.isNotBlank(cat)) {
+            boolQuery.filter(QueryBuilders.termQuery("category", cat));
+        }
+    }
+
     private boolean isEmpty(SearchResponse response) {
         if (response == null || response.getHits() == null || response.getHits().getTotalHits() == null) {
             return true;
@@ -156,21 +167,21 @@ public class SearchController {
     }
 
     /**
-     * 降级关键词：移除颜色/颜值等“软偏好词”，保留品类/品牌/核心名词，提高召回。
+     * \u964d\u7ea7\u641c\u7d22\uff1a\u5254\u9664\u989c\u8272\u7b49\u8bcd\uff0c\u63d0\u9ad8\u4e8c\u6b21\u53ec\u56de\u547d\u4e2d\u7387\u3002
      */
     private String degradeKeyword(String key) {
-        if (key == null) return "";
+        if (key == null) {
+            return "";
+        }
         String k = key;
-        // 常见颜色词
         String[] softWords = {
-                "金色", "土豪金", "香槟金", "银色", "黑色", "白色", "红色", "蓝色", "绿色", "紫色", "粉色", "灰色", "深空灰",
-                "颜值", "高颜值", "好看", "漂亮", "外观", "质感", "高级"
+                "\u84dd\u8272", "\u7eff\u8272", "\u7ea2\u8272", "\u9ec4\u8272", "\u9ed1\u8272", "\u767d\u8272", "\u7d2b\u8272", "\u7070\u8272", "\u7c89\u8272",
+                "\u68d5\u8272", "\u91d1\u8272", "\u94f6\u8272", "\u7c73\u8272", "\u6a59\u8272", "\u6df1\u84dd", "\u6d45\u84dd", "\u58a8\u7eff"
         };
         for (String w : softWords) {
             k = k.replace(w, " ");
         }
-        // 简单清理标点与多空格
-        k = k.replaceAll("[\\p{Punct}，。！？、；：\\s]+", " ").trim();
+        k = k.replaceAll("[\\p{Punct}\uff0c\u3002\uff01\uff1f\u3001\uff1b\uff1a\\s]+", " ").trim();
         return k;
     }
 }

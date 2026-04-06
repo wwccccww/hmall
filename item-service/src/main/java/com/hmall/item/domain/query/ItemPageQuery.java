@@ -20,6 +20,10 @@ public class ItemPageQuery extends PageQuery {
     private Integer minPrice;
     @ApiModelProperty("价格最大值")
     private Integer maxPrice;
+    @ApiModelProperty("规格颜色（与 ES specColor 文本匹配，可选）")
+    private String specColor;
+    @ApiModelProperty("规格尺寸（与 ES specSize 文本匹配，可选）")
+    private String specSize;
     /**
      * 商品状态：1 上架，2 下架，3 删除。不传则仅查上架（1），与同步到 ES 的数据一致。
      */

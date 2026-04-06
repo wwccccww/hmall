@@ -2,7 +2,6 @@ package com.hmall.ai.service.rag;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hmall.ai.knowledge.KnowledgeEsIndexService;
 import com.hmall.ai.knowledge.KnowledgeEsIndexService.KnowledgeHit;
 import com.hmall.ai.knowledge.KnowledgeVectorSearchService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +25,8 @@ import java.util.Map;
 public class SimpleRagService {
 
     private final ShoppingIntentParseService shoppingIntentParseService;
+    private final LlmShoppingIntentExtractor llmShoppingIntentExtractor;
+    private final ShoppingIntentMergeService shoppingIntentMergeService;
     private final ObjectProvider<KnowledgeVectorSearchService> knowledgeVectorSearch;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -206,7 +207,18 @@ public class SimpleRagService {
     private List<Map<String, Object>> fetchFromElasticsearch(String userMessage) throws Exception {
         String baseUrl = itemBaseUrl == null ? "http://item-service:8081" : itemBaseUrl;
         WebClient webClient = WebClient.builder().baseUrl(baseUrl).build();
-        ShoppingIntentParser.Parsed parsed = shoppingIntentParseService.parse(userMessage);
+        ShoppingIntentParser.Parsed rule = shoppingIntentParseService.parse(userMessage);
+        ShoppingIntentParser.Parsed parsed = shoppingIntentMergeService.merge(
+                rule, llmShoppingIntentExtractor.extract(userMessage).orElse(null));
+        log.info(
+                "RAG /search/list params key={} brand={} category={} price={}-{} specColor={} specSize={}",
+                parsed.getSearchKey(),
+                parsed.getBrand(),
+                parsed.getCategory(),
+                parsed.getMinPrice(),
+                parsed.getMaxPrice(),
+                parsed.getSpecColor(),
+                parsed.getSpecSize());
 
         int size = Math.max(5, Math.min(searchTopK, 50));
         String json = webClient.get()
@@ -229,6 +241,12 @@ public class SimpleRagService {
                     if (parsed.hasPriceBand()) {
                         b.queryParam("minPrice", parsed.getMinPrice());
                         b.queryParam("maxPrice", parsed.getMaxPrice());
+                    }
+                    if (parsed.getSpecColor() != null && !parsed.getSpecColor().isBlank()) {
+                        b.queryParam("specColor", parsed.getSpecColor());
+                    }
+                    if (parsed.getSpecSize() != null && !parsed.getSpecSize().isBlank()) {
+                        b.queryParam("specSize", parsed.getSpecSize());
                     }
                     return b.build();
                 })

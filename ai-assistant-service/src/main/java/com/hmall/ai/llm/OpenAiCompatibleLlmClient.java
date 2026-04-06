@@ -31,6 +31,29 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     @Override
+    public String chatWithSystem(String systemContent, String userContent, double temperature) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", props.getModel());
+        body.put("temperature", Math.max(0, Math.min(2, temperature)));
+        body.put("stream", false);
+        body.put("messages", List.of(
+                Map.of("role", "system", "content", systemContent == null ? "" : systemContent),
+                Map.of("role", "user", "content", userContent == null ? "" : userContent)
+        ));
+        return client().post()
+                .uri("/v1/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofMillis(props.getTimeoutMs()))
+                .flatMap(this::extractContent)
+                .blockOptional()
+                .orElse("");
+    }
+
+    @Override
     public String chat(String userMessage) {
         Map<String, Object> body = baseBody(userMessage);
         body.put("stream", false);

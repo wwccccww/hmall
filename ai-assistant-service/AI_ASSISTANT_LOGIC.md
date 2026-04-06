@@ -39,7 +39,7 @@ flowchart TD
 
 #### B. 本地 RAG + Chat Completions（未配置应用 ID 或回退时）
 
-- **商品（优先 ES）**：`SimpleRagService` 对用户消息做 **`ShoppingIntentParser` 轻量解析**（预算区间→`minPrice`/`maxPrice` 分、常见品牌→`brand`），再调 **`GET /search/list`**（与 [`SearchController`](d:/1study/study/java/program/hmall/item-service/src/main/java/com/hmall/item/controller/SearchController.java) 一致，`status=1`）。默认取 Top-K（**`hm.ai.rag.search-top-k`**），写入 prompt 时再按 **`hm.ai.rag.prompt-max-items`** 截断。若 ES 无结果或调用失败，回退 **`GET /items/page`** 分页 + 关键词过滤。
+- **商品（优先 ES）**：`SimpleRagService` 先做 **`ShoppingIntentParser` 规则解析**（预算区间→`minPrice`/`maxPrice` 分、常见品牌→`brand`、套话压缩 `key`），再与可选的 **LLM 意图抽取**（**`hm.ai.rag.llm-intent-enabled=true`** 且已配置 **`hm.ai.llm.api-key`**）合并：模型输出 `searchKey`/`category`/`brand`/`color`/`size` 等 JSON，经 **`ShoppingIntentMergeService`** 写入最终检索参数（**正则解出的价格带优先于 LLM**；**LLM 的 `category` 只并入 `key`，不直接作 ES `category` term**，避免与索引类目值不一致）。请求 **`GET /search/list`**（与 [`SearchController`](d:/1study/study/java/program/hmall/item-service/src/main/java/com/hmall/item/controller/SearchController.java) 一致）时可带 **`specColor`/`specSize`**（与 ES 字段对应）。默认 Top-K（**`hm.ai.rag.search-top-k`**），prompt 内再按 **`hm.ai.rag.prompt-max-items`** 截断。LLM 抽取失败或未启用时**仅用规则**，不阻断流程。若 ES 无结果或调用失败，回退 **`GET /items/page`** 分页 + 关键词过滤。
 - **公开券**：`GET /coupons`，最多 **`hm.ai.rag.public-coupon-max`** 条写入 prompt。
 - **本地知识库（独立 ES 向量索引）**：`knowledge-base/*.md` 构建时打进 classpath；启动时创建索引 **`hm.ai.knowledge.es-index`（默认 `ai_kb_chunks`）**，与用户 **商品 ES 索引隔离**。对用户问题调用 **`hm.ai.embedding.*`**（OpenAI 兼容 **`/v1/embeddings`**）得到向量，在 ES 7.12 上用 **`script_score` + `cosineSimilarity`** 取 Top-K 片段，写入 prompt 的 **【知识库向量检索】**；`sources` 中含 **`type=kb_chunk`**。若 **`hm.ai.knowledge.enabled=false`** 或 ES/Embedding 不可用，该段为空或仅打 WARN，不阻断商品/券 RAG。可通过 **`POST /ai/admin/reindex-kb`**（可选头 **`X-Admin-Token`**）全量重建索引；若 **`hm.ai.knowledge.auto-reindex-if-empty`** 为 true 且索引文档数为 0，启动后会异步执行一次全量导入。
 - 拼 prompt 后调用 **`LlmClient.chat`**（OpenAI 兼容 `/v1/chat/completions`，与 `hm.ai.llm.base-url` 一致）。
@@ -52,7 +52,7 @@ flowchart TD
 
 - **方法**：`GET`
 - **URL**（经网关示例）：`http://<gateway-host>:8080/search/list`
-- **Query**（与 `ItemPageQuery` 一致，可按用户填槽传入）：`pageNo=1`、`pageSize=20`、`key=<用户原话或压缩关键词>`、`brand=`、`minPrice=`、`maxPrice=`（单位：**分**）、`status=1`
+- **Query**（与 `ItemPageQuery` 一致，可按用户填槽传入）：`pageNo=1`、`pageSize=20`、`key=`、`brand=`、`category=`、`minPrice=`、`maxPrice=`（单位：**分**）、`specColor=`、`specSize=`、`status=1`
 - **鉴权**：若网关对 `/search/**` 免 JWT（见网关配置），可直接调；否则需带与前端一致的 `Authorization`。
 
 将工具返回的 `list`（商品 JSON）作为模型生成回答的依据，可避免「搜不到却瞎编」。
@@ -77,6 +77,7 @@ flowchart TD
 | 变量 / 配置 | 含义 |
 |-------------|------|
 | `HM_AI_ITEM_BASE_URL` / `hm.ai.rag.item-base-url` | 商品服务基址（同时用于 `/search/list` 与 `/items/page`） |
+| `HM_AI_RAG_LLM_INTENT_ENABLED` / `hm.ai.rag.llm-intent-enabled` | 是否在 ES 检索前用 LLM 抽取意图并与规则合并，默认 `false`；需同时配置有效 **`hm.ai.llm.api-key`** |
 | `HM_AI_RAG_USE_ES` / `hm.ai.rag.use-elasticsearch` | 是否优先走 ES，默认 `true` |
 | `HM_AI_RAG_SEARCH_TOP_K` / `hm.ai.rag.search-top-k` | `/search/list` 每页召回条数上限 |
 | `HM_AI_RAG_PROMPT_MAX_ITEMS` / `hm.ai.rag.prompt-max-items` | 写入 prompt 的商品条数上限 |
