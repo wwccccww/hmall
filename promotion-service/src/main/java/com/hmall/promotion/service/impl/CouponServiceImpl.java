@@ -45,6 +45,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,8 +81,8 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
 
     /** MQ Exchange（Topic 类型） */
     public static final String EXCHANGE    = "promotion.topic";
-    /** 抢券成功路由键 */
-    public static final String ROUTING_KEY = "coupon.receive";
+    /** 抢券成功路由键（与 {@code PromotionRabbitMqConfig.COUPON_RECEIVE_RK} 一致，v2 避免与旧无 DLX 队列冲突） */
+    public static final String ROUTING_KEY = "coupon.receive.v2";
 
     /** 预加载 Lua 脚本（只加载一次，带 SHA 缓存） */
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
@@ -338,7 +339,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
 
         // 4. 抢券成功：发送 MQ 消息，由消费者异步写入 user_coupon 表
         CouponReceiveMessage message = new CouponReceiveMessage(
-                userId, couponId, meta.endTime);
+                UUID.randomUUID().toString(), userId, couponId, meta.endTime);
         rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_KEY, message);
         log.info("用户 {} 抢券成功，couponId={}，已发送 MQ 消息", userId, couponId);
     }

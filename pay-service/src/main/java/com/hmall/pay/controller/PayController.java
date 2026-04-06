@@ -47,4 +47,10 @@ public class PayController {
     public List<PayOrderVO> queryPayOrders(){
         return BeanUtils.copyList(payOrderService.list(), PayOrderVO.class);
     }
+
+    /** 微服务对账：支付是否已成功（仅服务间调用，勿对外暴露） */
+    @GetMapping("/internal/paid/{bizOrderNo}")
+    public Boolean internalIsBizOrderPaid(@PathVariable("bizOrderNo") Long bizOrderNo) {
+        return payOrderService.isBizOrderPaid(bizOrderNo);
+    }
 }

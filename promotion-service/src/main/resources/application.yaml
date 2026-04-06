@@ -14,6 +14,21 @@ spring:
         server-addr: ${spring.cloud.nacos.server-addr}
   profiles:
     active: local
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:192.168.116.130}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:sail}
+    password: ${SPRING_RABBITMQ_PASSWORD:123}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/hmall}
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2
+          max-interval: 10000ms
   datasource:
     url: jdbc:mysql://${hm.db.host:192.168.116.130}:3306/hm-promotion?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
     driver-class-name: com.mysql.cj.jdbc.Driver

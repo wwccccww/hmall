@@ -40,6 +40,8 @@
         <hutool.version>5.8.11</hutool.version>
         <mysql.version>8.0.23</mysql.version>
         <elasticsearch.version>7.12.1</elasticsearch.version>
+        <!-- Seata 等传递依赖曾锁定 druid 1.2.6，其 POM 含无效 systemPath，导致 Maven 解析失败 -->
+        <druid.version>1.2.23</druid.version>
     </properties>
 
     <!-- 对依赖包进行管理 -->
@@ -78,6 +80,16 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid</artifactId>
+                <version>${druid.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid-spring-boot-starter</artifactId>
+                <version>${druid.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

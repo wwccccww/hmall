@@ -64,7 +64,7 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
         }
         // 5.修改订单状态 基于MQ修改
         try {
-            rabbitTemplate.convertAndSend("pay.direct", "pay.success", po.getBizOrderNo());
+            rabbitTemplate.convertAndSend("pay.direct", "pay.success.v2", po.getBizOrderNo());
         } catch (AmqpException e) {
             throw new RuntimeException(e);
         }
@@ -124,6 +124,12 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
                 .eq(PayOrder::getBizOrderNo, bizOrderNo)
                 .last("limit 1") // 确保即使有重复脏数据也不会报 500
                 .one();
+    }
+
+    @Override
+    public boolean isBizOrderPaid(Long bizOrderNo) {
+        PayOrder po = queryByBizOrderNo(bizOrderNo);
+        return po != null && PayStatus.TRADE_SUCCESS.equalsValue(po.getStatus());
     }
 
     private PayOrder buildPayOrder(PayApplyDTO payApplyDTO) {

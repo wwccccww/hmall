@@ -4,6 +4,17 @@ server:
 hm:
   db:
     database: hm-user
+  jwt:
+    location: classpath:hmall.jks
+    alias: hmall
+    password: hmall123
+    tokenTTL: 30m
+  auth:
+    excludePaths:
+      - /search/**
+      - /users/login
+      - /items/**
+      - /hi
 
 spring:
   application:
@@ -67,18 +78,4 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.hmall.user.controller
-hm:
-  db:
-    database: hm-user
-  jwt:
-    location: classpath:hmall.jks
-    alias: hmall
-    password: hmall123
-    tokenTTL: 30m
-  auth:
-    excludePaths:
-      - /search/**
-      - /users/login
-      - /items/**
-      - /hi
 # keytool -genkeypair -alias hmall -keyalg RSA -keypass hmall123 -keystore hmall.jks -storepass hmall123

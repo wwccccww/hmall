@@ -1,11 +1,9 @@
 package com.hmall.promotion.mq;
 
+import com.hmall.promotion.config.PromotionRabbitMqConfig;
 import com.hmall.promotion.service.IUserCouponService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +14,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>削峰：DB 写压力平摊到消费者消费速度</li>
  *   <li>解耦：抢券接口响应不受 DB 写入延迟影响</li>
- *   <li>可靠投递：RabbitMQ 持久化队列 + 手动 ACK（Spring 默认 AUTO_ACK）</li>
+ *   <li>可靠投递：持久化队列 + 重试 + 死信；失败经 DLX 进入 DLQ 便于人工重投</li>
  * </ul>
  */
 @Slf4j
@@ -26,13 +24,9 @@ public class CouponReceiveListener {
 
     private final IUserCouponService userCouponService;
 
-    @RabbitListener(bindings = @QueueBinding(
-            value    = @Queue(value = "promotion.coupon.receive.queue", durable = "true"),
-            exchange = @Exchange(name = "promotion.topic", type = "topic"),
-            key      = "coupon.receive"
-    ))
+    @RabbitListener(queues = PromotionRabbitMqConfig.COUPON_RECEIVE_QUEUE)
     public void onCouponReceive(CouponReceiveMessage message) {
-        log.info("收到领券消息，userId={}, couponId={}", message.getUserId(), message.getCouponId());
+        log.info("收到领券消息，messageId={}, userId={}, couponId={}", message.getMessageId(), message.getUserId(), message.getCouponId());
         userCouponService.saveFromMessage(message);
     }
 }

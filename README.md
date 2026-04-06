@@ -70,4 +70,5 @@ docker compose up -d --build
 ## 4. 常见问题
 
 - **`doc.html` 打不开 / 没接口**：检查 Nacos 中 `shared-swagger.yaml` 的占位符 `hm.swagger.*` 是否被各服务正确覆盖；或直接访问 `http://localhost:<port>/v2/api-docs` 看 `paths`。\n- **端口冲突**：修改 `docker-compose.yml` 的端口映射。\n- **数据库表缺失**：当前 Compose 仅内置 `hm-promotion` 的核心表初始化，其它服务表结构请按你环境补充 SQL（可逐步完善到 `docker/mysql/init/`）。\n
+- **RabbitMQ `PRECONDITION_FAILED` / `inequivalent arg 'x-dead-letter-exchange'`**：说明 Broker 里已有**同名队列**但**没有**死信相关参数，与当前代码声明不一致。本项目已改用 **v2** 队列与路由（`coupon.receive.v2`、`promotion.coupon.receive.queue.v2`、`pay.success.v2`、`trade.pay.success.queue.v2`），一般**重启即可**。若仍在使用旧队列，可在管理台 **删除** 旧队列：`promotion.coupon.receive.queue`、`trade.pay.success.queue`（无消费者后删除），避免与 v2 并存时误绑同一路由造成重复消费。\n
 

@@ -15,4 +15,9 @@ public interface IPayOrderService extends IService<PayOrder> {
     String applyPayOrder(PayApplyDTO applyDTO);
 
     void tryPayOrderByBalance(PayOrderFormDTO payOrderFormDTO);
+
+    /**
+     * 内部对账：业务订单号是否已支付成功。
+     */
+    boolean isBizOrderPaid(Long bizOrderNo);
 }

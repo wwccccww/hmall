@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CouponReceiveMessage {
 
+    /** 消息幂等键（发送端生成 UUID） */
+    private String messageId;
+
     private Long userId;
 
     private Long couponId;

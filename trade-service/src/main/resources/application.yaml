@@ -23,6 +23,15 @@ spring:
     virtual-host: /hmall
     username: sail
     password: 123
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2
+          max-interval: 10000ms
 
   output:
     ansi:
@@ -62,6 +71,10 @@ feign:
     enabled: true
 
 hm:
+  mq:
+    compensation-interval-ms: 120000
+    compensation-order-min-age-minutes: 2
+    compensation-batch-size: 50
   db:
     database: hm-trade
   jwt:
