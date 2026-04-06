@@ -3,4 +3,13 @@ hm:
     title: AI 导购助手接口文档
     description: 用户态 RAG + 工具调用
     package: com.hmall.ai
+  ai:
+    rag:
+      # 本机直接运行 AI 服务时使用；Docker 内请用 application.yaml 默认（item-service / promotion-service 主机名）
+      item-base-url: ${HM_AI_ITEM_BASE_URL:http://localhost:8081}
+      promotion-base-url: ${HM_AI_PROMOTION_BASE_URL:http://localhost:8087}
+    knowledge:
+      # 与 item-service 使用同一 ES 集群时可填本机；若与 hm.es.host 一致可改成你的环境 IP
+      es-host: ${HM_AI_KNOWLEDGE_ES_HOST:192.168.116.130}
+      es-port: ${HM_AI_KNOWLEDGE_ES_PORT:9200}
 

@@ -41,6 +41,7 @@ flowchart TD
 
 - **商品（优先 ES）**：`SimpleRagService` 对用户消息做 **`ShoppingIntentParser` 轻量解析**（预算区间→`minPrice`/`maxPrice` 分、常见品牌→`brand`），再调 **`GET /search/list`**（与 [`SearchController`](d:/1study/study/java/program/hmall/item-service/src/main/java/com/hmall/item/controller/SearchController.java) 一致，`status=1`）。默认取 Top-K（**`hm.ai.rag.search-top-k`**），写入 prompt 时再按 **`hm.ai.rag.prompt-max-items`** 截断。若 ES 无结果或调用失败，回退 **`GET /items/page`** 分页 + 关键词过滤。
 - **公开券**：`GET /coupons`，最多 **`hm.ai.rag.public-coupon-max`** 条写入 prompt。
+- **本地知识库（独立 ES 向量索引）**：`knowledge-base/*.md` 构建时打进 classpath；启动时创建索引 **`hm.ai.knowledge.es-index`（默认 `ai_kb_chunks`）**，与用户 **商品 ES 索引隔离**。对用户问题调用 **`hm.ai.embedding.*`**（OpenAI 兼容 **`/v1/embeddings`**）得到向量，在 ES 7.12 上用 **`script_score` + `cosineSimilarity`** 取 Top-K 片段，写入 prompt 的 **【知识库向量检索】**；`sources` 中含 **`type=kb_chunk`**。若 **`hm.ai.knowledge.enabled=false`** 或 ES/Embedding 不可用，该段为空或仅打 WARN，不阻断商品/券 RAG。可通过 **`POST /ai/admin/reindex-kb`**（可选头 **`X-Admin-Token`**）全量重建索引；若 **`hm.ai.knowledge.auto-reindex-if-empty`** 为 true 且索引文档数为 0，启动后会异步执行一次全量导入。
 - 拼 prompt 后调用 **`LlmClient.chat`**（OpenAI 兼容 `/v1/chat/completions`，与 `hm.ai.llm.base-url` 一致）。
 
 **注意**：用户私有「我的优惠券」「地址」仍仅在工具关键词命中时查询；工具合成**始终**走 Chat Completions，不会走百炼应用 Responses，以免干扰结构化 JSON 提示。
@@ -63,6 +64,7 @@ flowchart TD
 |------|---------------------------|------|
 | 商品 | **否** | 优先 ES `search-top-k` 召回，进 prompt 再截断 `prompt-max-items`；回退分页有上限 |
 | 公开进行中券 | **否** | 仅 `GET /coupons` 摘要前 N 条 |
+| 知识库 FAQ（本地 ES） | **否** | `hm.ai.knowledge.search-top-k` 召回 + `max-prompt-chars` 截断 |
 | 我的优惠券 | **仅关键词触发** | `/coupons/my`；工具路径可走 LLM 合成 |
 | 地址 | **仅关键词触发** | 脱敏后字段有限 |
 
@@ -84,3 +86,5 @@ flowchart TD
 | `HM_AI_LLM_*` | 大模型 OpenAI 兼容接口（`base-url` 一般为 `https://dashscope.aliyuncs.com/compatible-mode/v1`） |
 | `HM_AI_BAILIAN_APP_ID` / `hm.ai.llm.bailian-app-id` | 百炼应用 ID；非空则通用导购走 Responses API |
 | `HM_AI_BAILIAN_ENDPOINT_BASE` | 可选，默认 `https://dashscope.aliyuncs.com`（国际地域可换） |
+| `HM_AI_KNOWLEDGE_*` / `hm.ai.knowledge.*` | 向量知识库：开关、**ES 地址/端口/索引名**、Top-K、自动空库导入、`admin-token` |
+| `HM_AI_EMBEDDING_*` / `hm.ai.embedding.*` | Embeddings：`base-url`（如百炼 `.../compatible-mode`）、`model`、`dims`（须与索引一致）、`api-key`（可空则回退 LLM key） |

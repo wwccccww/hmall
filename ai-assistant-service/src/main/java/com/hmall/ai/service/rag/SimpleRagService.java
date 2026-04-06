@@ -2,8 +2,12 @@ package com.hmall.ai.service.rag;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmall.ai.knowledge.KnowledgeEsIndexService;
+import com.hmall.ai.knowledge.KnowledgeEsIndexService.KnowledgeHit;
+import com.hmall.ai.knowledge.KnowledgeVectorSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ import java.util.Map;
 public class SimpleRagService {
 
     private final ShoppingIntentParseService shoppingIntentParseService;
+    private final ObjectProvider<KnowledgeVectorSearchService> knowledgeVectorSearch;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -58,6 +63,10 @@ public class SimpleRagService {
     @Value("${hm.ai.mall.front-base-url:${HM_AI_MALL_FRONT_BASE_URL:}}")
     private String mallFrontBaseUrl;
 
+    /** 写入 prompt 的向量知识库摘录总长上限 */
+    @Value("${hm.ai.knowledge.max-prompt-chars:3600}")
+    private int knowledgeMaxPromptChars;
+
     /** 商品分页大小 */
     private static final int ITEM_PAGE_SIZE = 50;
 
@@ -70,6 +79,17 @@ public class SimpleRagService {
         List<Map<String, Object>> sources = new ArrayList<>();
         String itemContext = "";
         String couponContext = "";
+        String kbContext = "";
+
+        try {
+            KnowledgeVectorSearchService kb = knowledgeVectorSearch.getIfAvailable();
+            if (kb != null) {
+                List<KnowledgeHit> hits = kb.search(userMessage);
+                kbContext = appendKnowledgeHits(sources, hits);
+            }
+        } catch (Exception e) {
+            log.warn("RAG knowledge vector search failed: {}", e.getMessage());
+        }
 
         try {
             List<Map<String, Object>> items = fetchItemCandidates(userMessage);
@@ -94,7 +114,7 @@ public class SimpleRagService {
         StringBuilder prompt = new StringBuilder();
         prompt.append("你是电商导购助手，请用中文回答。\n");
         prompt.append("规则：\n");
-        prompt.append("- 只能基于【候选商品信息】与【公开进行中优惠券摘要】做推荐与解释；如果信息不足，请说明“未找到依据”，并合理追问。\n");
+        prompt.append("- 只能基于【候选商品信息】、【公开进行中优惠券摘要】与【知识库向量检索】中的内容做推荐与解释；若用户问价格/库存/能否购买，以候选商品为准；知识库多为规则与常见问题，与实时促销冲突时以商品与券摘要为准。\n");
         prompt.append("- 不要编造未在上下文中出现的商品 ID、价格或券规则。\n");
         prompt.append("- 若用户已在问题里写明硬性偏好（如颜色「金色」、预算区间、品牌），但候选商品均不满足：须在结论中明确「当前候选中没有符合该条件的商品」，可把清单作为外观/定位相近的替代选项，并说明它们不满足哪一条。\n");
         prompt.append("- 切勿让用户重复他已经说过的条件（例如已问金色却仍写「请补充金色偏好」）；应改为：是否接受其它颜色/提高预算/换品牌，或说明可到卖场再看新SKU。\n");
@@ -106,8 +126,48 @@ public class SimpleRagService {
         prompt.append("【用户问题】\n").append(userMessage).append("\n\n");
         prompt.append("【候选商品信息】\n").append(itemContext.isEmpty() ? "（无）\n" : itemContext).append("\n");
         prompt.append("【公开进行中优惠券摘要】\n").append(couponContext.isEmpty() ? "（无）\n" : couponContext).append("\n");
+        prompt.append("【知识库向量检索（平台说明/FAQ，非实时价）】\n").append(kbContext.isEmpty() ? "（无）\n" : kbContext).append("\n");
 
         return new RagResult(prompt.toString(), sources);
+    }
+
+    /**
+     * 将知识库命中写入 sources，并返回拼入 prompt 的纯文本（受字数上限截断）。
+     */
+    private String appendKnowledgeHits(
+            List<Map<String, Object>> sources,
+            List<KnowledgeHit> hits) {
+        if (hits == null || hits.isEmpty()) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        int remaining = Math.max(500, knowledgeMaxPromptChars);
+        int idx = 1;
+        for (KnowledgeHit h : hits) {
+            Map<String, Object> src = new LinkedHashMap<>();
+            src.put("type", "kb_chunk");
+            src.put("chunkId", h.chunkId());
+            src.put("sourceFile", h.sourceFile());
+            src.put("score", h.score());
+            String excerpt = h.text();
+            if (excerpt != null && excerpt.length() > 1200) {
+                excerpt = excerpt.substring(0, 1200) + "…";
+            }
+            src.put("text", excerpt);
+            sources.add(src);
+            String block = "(" + idx + ") [score=" + String.format("%.3f", h.score()) + "] " + excerpt + "\n\n";
+            idx++;
+            if (block.length() >= remaining) {
+                text.append(block, 0, Math.min(block.length(), remaining));
+                break;
+            }
+            text.append(block);
+            remaining -= block.length();
+            if (remaining <= 0) {
+                break;
+            }
+        }
+        return text.toString().trim();
     }
 
     /**

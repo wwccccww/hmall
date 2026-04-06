@@ -39,3 +39,24 @@ hm:
       search-top-k: ${HM_AI_RAG_SEARCH_TOP_K:20}
       prompt-max-items: ${HM_AI_RAG_PROMPT_MAX_ITEMS:12}
 
+    # 本地 Markdown → ES 向量索引（索引名默认 ai_kb_chunks，与商品索引隔离）
+    # es-host：必须与「运行 ai-assistant 的进程」网络可达（本机连虚拟机填虚拟机 IP；同机填 localhost）
+    knowledge:
+      enabled: ${HM_AI_KNOWLEDGE_ENABLED:true}
+      es-host: ${HM_AI_KNOWLEDGE_ES_HOST:192.168.116.130}
+      es-port: ${HM_AI_KNOWLEDGE_ES_PORT:9200}
+      es-index: ${HM_AI_KNOWLEDGE_ES_INDEX:ai_kb_chunks}
+      search-top-k: ${HM_AI_KNOWLEDGE_SEARCH_TOP_K:5}
+      max-prompt-chars: ${HM_AI_KNOWLEDGE_MAX_PROMPT_CHARS:3600}
+      auto-reindex-if-empty: ${HM_AI_KNOWLEDGE_AUTO_REINDEX:true}
+      admin-token: ${HM_AI_KNOWLEDGE_ADMIN_TOKEN:}
+
+    # OpenAI 兼容 /v1/embeddings（默认百炼 compatible-mode；dims 须与模型一致）
+    embedding:
+      base-url: ${HM_AI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      model: ${HM_AI_EMBEDDING_MODEL:text-embedding-v2}
+      api-key: ${HM_AI_EMBEDDING_API_KEY:}
+      dims: ${HM_AI_EMBEDDING_DIMS:1536}
+      timeout-ms: ${HM_AI_EMBEDDING_TIMEOUT_MS:30000}
+      batch-size: ${HM_AI_EMBEDDING_BATCH_SIZE:8}
+

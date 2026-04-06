@@ -16,8 +16,8 @@
 
 ## 与本服务的关系
 
-- 在根目录 `.env` 中设置 **`HM_AI_BAILIAN_APP_ID=<你的应用ID>`** 后，`ai-assistant-service` 会通过 `BailianResponsesClient` 调用百炼 **Responses API**，由百炼完成检索增强（RAG）。
-- 未配置应用 ID 或调用失败时，服务会回退到 **本地 RAG**（拉取商品检索、公开券等），详见 `../AI_ASSISTANT_LOGIC.md`。
+- **本地向量 RAG（Elasticsearch）**：构建 `ai-assistant-service` 时本目录会作为资源打进 **`classpath:knowledge-base/*.md`**。服务连 **`hm.ai.knowledge.es-*`** 所指 ES 集群（与商品索引 **不同索引名**，默认 `ai_kb_chunks`），对 Markdown 按 `##` 切分后经 **`hm.ai.embedding.*`** 调用 **`/v1/embeddings`** 写入向量；用户提问时再做 embedding + **ES `script_score` 余弦** 检索。修改文档后请 **`POST /ai/admin/reindex-kb`**（或依赖「空库自动导入」）重建索引。**`hm.ai.embedding.dims` 必须与所选用 Embedding 模型维度一致**（如 `text-embedding-v2` 常见为 1536）。
+- **百炼（可选）**：在根目录 `.env` 中设置 **`HM_AI_BAILIAN_APP_ID=<你的应用ID>`** 后，通用导购优先走百炼 **Responses API**；失败或未配置时回退 **本地 RAG**（商品 + 公开券 + **上述 ES 知识库**）。
 - 本知识库侧重 **平台规则、购物说明、助手能力说明**；**实时商品价格、库存、个人订单** 仍以接口与工具查询为准，请勿在文档中写死具体 SKU 价格。
 
 ## 建议导入步骤（控制台）
@@ -28,7 +28,30 @@
 4. 复制应用 ID，写入项目根目录 `.env`：`HM_AI_BAILIAN_APP_ID=<应用ID>`，并保证 `HM_AI_LLM_API_KEY` 与控制台一致。
 5. 重启 `ai-assistant-service` 后，通用导购类问题将优先走百炼内置 RAG。
 
+## 虚拟机 / Docker 上跑中间件时怎么配 ES
+
+与 `docker ps` 类似环境（示例：**elasticsearch:7.12.1** 映射 **9200**、**kibana:7.12.1** 映射 **5601**、`nacos` **8848**）对齐时注意：**连哪一个「主机名」取决于你的微服务进程跑在哪里**。
+
+| 微服务运行位置 | `HM_AI_KNOWLEDGE_ES_HOST`（及 item 商品检索的 `hm.es.host`）建议 |
+|----------------|----------------------------------------------------------------------|
+| 与 ES **同一台虚拟机**，且在 **宿主机** 上直接跑 Spring Boot（未进容器） | `localhost` 或 `127.0.0.1`（端口 **9200** 已映射到宿主机时） |
+| 与 ES **同一 Docker Compose 网络**里的容器 | 使用 Compose 里 **ES 服务名**（常见为 `es`，以你的 `docker-compose.yml` 为准） |
+| 在 **另一台电脑**（如本机 Windows）连 VM 上的 ES | 填 **虚拟机的局域网 IP**（确保防火墙放行 **9200**，且 ES 监听 `0.0.0.0` 你已满足） |
+
+环境变量示例（在 VM 宿主机跑 `ai-assistant-service` 且端口已映射）：
+
+```bash
+export HM_AI_KNOWLEDGE_ES_HOST=127.0.0.1
+export HM_AI_KNOWLEDGE_ES_PORT=9200
+```
+
+从别处连 VM：`HM_AI_KNOWLEDGE_ES_HOST=<虚拟机IP>`。
+
+**可视化**：浏览器打开 **`http://<虚拟机IP>:5601`** 进 Kibana → **Stack Management → Index Management**（或 **Dev Tools**）查看索引 **`ai_kb_chunks`** 是否创建、文档量是否增长；这与本服务的「知识库是否入库」对应。
+
+**商品检索**：`item-service` 仍连同一 ES（默认 `hm.es.host`），需与上述 **同一集群**，否则商品在 A 集群、知识库在 B 集群会不一致。
+
 ## 维护说明
 
-- 若业务规则变更，请同步修改对应 Markdown 并在控制台 **重新导入或更新切片**。
+- 若业务规则变更，请同步修改对应 Markdown：**本地 ES 方案**下重新 **`mvn package` 后调 reindex**；**百炼方案**下在控制台重新导入或更新切片。
 - `06-配送与售后` 为演示占位内容，上线前请替换为真实政策。
