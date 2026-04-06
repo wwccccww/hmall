@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -132,6 +133,7 @@ public class ItemServiceImpl extends ServiceImpl<ItemMapper, Item> implements II
     // ======================== 写操作（先写 DB，再删缓存） ========================
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deductStock(List<OrderDetailDTO> items) {
         log.info("更新库存，商品列表：{}", items);
         String sqlStatement = "com.hmall.item.mapper.ItemMapper.updateStock";

@@ -1,0 +1,14 @@
+# Seata 客户端（AT 模式）共享配置，参与全局事务的服务需引入此 data-id。
+# 默认 TC 地址为虚拟机（与同仓库 Nacos/MySQL 等一致）：192.168.116.130:8091
+# 若 TC 部署在其它机器，可设置环境变量 SEATA_SERVER_ADDR 覆盖，例如：SEATA_SERVER_ADDR=192.168.1.10:8091
+seata:
+  enabled: true
+  application-id: ${spring.application.name}
+  tx-service-group: hmall_tx_group
+  enable-auto-data-source-proxy: true
+  data-source-proxy-mode: AT
+  service:
+    vgroup-mapping:
+      hmall_tx_group: default
+    grouplist:
+      default: ${SEATA_SERVER_ADDR:192.168.116.130:8091}

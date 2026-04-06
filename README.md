@@ -22,7 +22,8 @@ docker compose up -d --build
 - 拉起 MySQL / Redis / RabbitMQ / Nacos
 - 初始化 MySQL 数据库（创建库 + 初始化 `hm-promotion` 的核心表）
 - 启动各微服务与网关
-- 写入 Nacos 配置：`shared-jdbc.yaml` / `shared-log.yaml` / `shared-swagger.yaml` / `gateway-routes.json`
+- 写入 Nacos 配置：`shared-jdbc.yaml` / `shared-log.yaml` / `shared-swagger.yaml` / `shared-seata.yaml` / `gateway-routes.json`
+- **Seata TC** 需在虚拟机单独部署（默认地址 **`192.168.116.130:8091`**，与 `shared-seata.yaml` 一致；Console 常用 `7091`）
 
 ### 1.3 验证
 
@@ -31,6 +32,7 @@ docker compose up -d --build
 - **用户服务文档**：`http://localhost:8084/doc.html`
 - **第二个促销实例（可选）**：`http://localhost:8088/doc.html`
 - **RabbitMQ 管理台**：`http://localhost:15672`（默认用户 `sail`，密码 `123`，可在 `docker-compose.yml` 通过环境变量覆盖）
+- **Seata**：TC 默认 **`192.168.116.130:8091`**（虚拟机）；下单扣库存为 **`trade-service` `@GlobalTransactional` + `item-service` AT 分支**。`hm-trade` / `hm-item` 需有表 `undo_log`（见 `docker/mysql/init/05-seata-undo-log.sql`）。若 TC 不在该地址，设置环境变量 **`SEATA_SERVER_ADDR`** 覆盖；更新 Nacos 中的 `shared-seata.yaml` 后需重新 `nacos-seed` 或手动发布配置。
 
 ## 2. 秒杀抢券（演示要点）
 
