@@ -17,6 +17,11 @@ knife4j:
 
 hm:
   ai:
+    # 工具调用（我的信息/地址/券/订单）直连下游；本机开发默认 localhost，虚拟机/ Docker 请改环境变量
+    downstream:
+      user-service-url: ${HM_AI_USER_SERVICE_URL:http://localhost:8084}
+      trade-service-url: ${HM_AI_TRADE_SERVICE_URL:http://localhost:8085}
+      promotion-service-url: ${HM_AI_PROMOTION_SERVICE_URL:http://localhost:8087}
     # TODO可选：配置后每条商品来源会带完整商品页链接（如 http://localhost:5173）；不配则仅相对路径 /product/:id
     mall:
       front-base-url: ${HM_AI_MALL_FRONT_BASE_URL:}

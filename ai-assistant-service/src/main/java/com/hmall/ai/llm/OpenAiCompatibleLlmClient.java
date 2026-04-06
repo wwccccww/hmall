@@ -72,7 +72,8 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         body.put("model", props.getModel());
         body.put("temperature", 0.2);
         body.put("messages", List.of(
-                Map.of("role", "system", "content", "你是电商导购助手。回答要简洁、可执行，避免编造；如缺少信息请明确说明。"),
+                Map.of("role", "system", "content", "你是电商导购助手。回答要简洁、可执行，避免编造；如缺少信息请明确说明。"
+                        + "勿在回答中输出 JSON 或 Markdown 代码块；结构化数据由前端卡片展示时用自然语言概括即可。"),
                 Map.of("role", "user", "content", userMessage)
         ));
         return body;

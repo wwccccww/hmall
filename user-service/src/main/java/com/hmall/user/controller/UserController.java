@@ -62,8 +62,14 @@ public class UserController {
     @ApiOperation("获取当前登录用户详情")
     @SecurityRequirement(name = UserOpenApiConfiguration.USER_INFO_SCHEME)
     @GetMapping("/me")
-    public UserLoginVO queryMe(){
-        return com.hmall.common.utils.BeanUtils.copyBean(userService.getById(com.hmall.common.utils.UserContext.getUser()), UserLoginVO.class);
+    public UserLoginVO queryMe() {
+        User user = userService.getById(com.hmall.common.utils.UserContext.getUser());
+        if (user == null) {
+            return null;
+        }
+        UserLoginVO vo = com.hmall.common.utils.BeanUtils.copyBean(user, UserLoginVO.class);
+        vo.setUserId(user.getId());
+        return vo;
     }
 }
 

@@ -1,5 +1,27 @@
 import request from '@/utils/request'
 
+function aiFetchHeaders() {
+  const h = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream'
+  }
+  const raw = sessionStorage.getItem('token') || ''
+  const token =
+    raw && raw !== 'undefined' && raw !== 'null' ? String(raw).trim() : ''
+  if (token) {
+    h.authorization = token
+    try {
+      const u = JSON.parse(sessionStorage.getItem('user-info') || 'null')
+      if (u && u.userId != null && u.userId !== '') {
+        h['user-info'] = String(u.userId)
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return h
+}
+
 /** AI 对话（同步） */
 export function aiChatSync(message, context) {
   return request.post('/ai/chat/sync', { message, context })
@@ -9,16 +31,14 @@ export function aiChatSync(message, context) {
  * AI 对话（SSE 流式）
  * 注意：浏览器原生 EventSource 不支持 POST，这里用 fetch + ReadableStream 解析 SSE。
  */
-export async function aiChatStream(message, { context, onDelta, onSources, onDone, onError } = {}) {
+export async function aiChatStream(
+  message,
+  { context, onDelta, onSources, onResult, onDone, onError } = {}
+) {
   try {
-    const token = sessionStorage.getItem('token') || ''
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        ...(token ? { authorization: token } : {})
-      },
+      headers: aiFetchHeaders(),
       body: JSON.stringify({ message, context: context || null })
     })
 
@@ -39,7 +59,7 @@ export async function aiChatStream(message, { context, onDelta, onSources, onDon
       while ((idx = buf.indexOf('\n\n')) >= 0) {
         const rawEvent = buf.slice(0, idx)
         buf = buf.slice(idx + 2)
-        handleSseEvent(rawEvent, { onDelta, onSources, onDone })
+        handleSseEvent(rawEvent, { onDelta, onSources, onResult, onDone, onError })
       }
     }
 
@@ -50,7 +70,7 @@ export async function aiChatStream(message, { context, onDelta, onSources, onDon
   }
 }
 
-function handleSseEvent(rawEvent, { onDelta, onSources, onDone }) {
+function handleSseEvent(rawEvent, { onDelta, onSources, onResult, onDone, onError }) {
   // SSE event format:
   // event: message
   // data: {"delta":"..."}
@@ -79,6 +99,12 @@ function handleSseEvent(rawEvent, { onDelta, onSources, onDone }) {
     const src = payload?.sources ?? payload
     const act = payload?.actions
     onSources?.(act != null ? { sources: src, actions: act } : src)
+  } else if (eventName === 'result') {
+    // 工具类路径：整包 ChatResponse（与 /ai/chat/sync 一致）
+    onResult?.(payload)
+  } else if (eventName === 'error') {
+    const msg = payload?.message ?? payload?.raw ?? 'SSE error'
+    onError?.(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
   } else if (eventName === 'done') {
     onDone?.()
   }

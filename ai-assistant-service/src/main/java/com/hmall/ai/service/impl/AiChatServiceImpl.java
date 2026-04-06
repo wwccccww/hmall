@@ -47,7 +47,8 @@ public class AiChatServiceImpl implements AiChatService {
     private static final Pattern ORDER_ID = Pattern.compile("(\\d{6,})");
     /** 百炼智能体输入前缀 */
     private static final String BAILIAN_INPUT_PREFIX =
-            "你是电商导购助手，请用中文、结合知识库（如有）简洁回答；勿编造知识库未提供的事实。\n\n用户问题：\n";
+            "你是电商导购助手，请用中文、结合知识库（如有）简洁回答；勿编造知识库未提供的事实。"
+                    + "勿输出 JSON 或 Markdown 代码块；商品与价格若有结构化展示由客户端卡片完成，仅用自然语言概括即可。\n\n用户问题：\n";
 
     /**
      * 同步调用
@@ -263,8 +264,19 @@ public class AiChatServiceImpl implements AiChatService {
         List<Map<String, Object>> actions = new ArrayList<>();
 
         //TODO 这里是否优化一下，比如用正则表达式匹配优惠券、地址等关键词
-        // 有可能会说我有那些优惠劵，我需要查询一下我的优惠券列表
-        if (m.contains("我的优惠券") || m.contains("可用券") || m.contains("优惠券有哪些")) {
+        // 自然说法差异：「优惠券有哪些」≠「我有哪些优惠券」；「券/劵」混写
+        boolean askMyCoupons =
+                m.contains("我的优惠券")
+                        || m.contains("我的优惠劵")
+                        || m.contains("有哪些优惠券")
+                        || m.contains("有哪些优惠劵")
+                        || m.contains("我有哪些券")
+                        || m.contains("我有什么优惠券")
+                        || m.contains("我有什么优惠劵")
+                        || m.contains("可用券")
+                        || m.contains("优惠券有哪些")
+                        || m.contains("优惠劵有哪些");
+        if (askMyCoupons) {
             if (!loggedIn) {
                 return ChatResponse.builder().answer("请先登录后再查询“我的优惠券”。").sources(List.of()).actions(List.of()).build();
             }
@@ -367,7 +379,8 @@ public class AiChatServiceImpl implements AiChatService {
             String json = objectMapper.writeValueAsString(sources);
             //TODO 问ai的prompt
             String prompt = "用户问题：\n" + userMessage + "\n\n系统查询结果（JSON，仅可据此回答，勿编造字段）：\n"
-                    + json + "\n\n请用简洁中文直接回答；列表请做可读摘要；已脱敏字段（如 ***）请保持脱敏表述。";
+                    + json + "\n\n请用简洁中文直接回答；列表请做可读摘要；已脱敏字段（如 ***）请保持脱敏表述。"
+                    + "回答正文中勿重复粘贴整段 JSON 或代码块。";
             String out = llmClient.chat(prompt);
             if (out != null && !out.isBlank()) {
                 return out;

@@ -49,6 +49,19 @@ export {
   showApiErrorAlert
 } from './apiError'
 
+/** 登录态下供下游解析 UserContext（与网关 JWT 写入的 user-info 一致；直连微服务时浏览器需自带） */
+function userInfoIdFromStorage() {
+  try {
+    const raw = sessionStorage.getItem('user-info')
+    if (!raw) return ''
+    const u = JSON.parse(raw)
+    if (u && u.userId != null && u.userId !== '') return String(u.userId)
+  } catch {
+    /* ignore */
+  }
+  return ''
+}
+
 request.interceptors.request.use(
   config => {
     const raw = sessionStorage.getItem('token')
@@ -56,8 +69,15 @@ request.interceptors.request.use(
       raw && raw !== 'undefined' && raw !== 'null' ? String(raw).trim() : ''
     if (token) {
       config.headers['authorization'] = token
+      const uid = userInfoIdFromStorage()
+      if (uid) {
+        config.headers['user-info'] = uid
+      } else {
+        delete config.headers['user-info']
+      }
     } else {
       delete config.headers['authorization']
+      delete config.headers['user-info']
     }
     return config
   }
