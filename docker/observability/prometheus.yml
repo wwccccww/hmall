@@ -2,31 +2,80 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  # 微服务与 Prometheus 同 Docker 网络且主机名为下列服务名时生效。
-  - job_name: hmall-services
+  # ---------------------------------------------------------------------------
+  # 微服务在 Windows 本机跑、Prometheus 在虚拟机 Docker 里时：用下面这个 job。
+  # 默认 192.168.116.1 为 VMware NAT（VMnet8）在 Windows 侧的地址；与虚拟机 192.168.116.x 同网段。
+  # 「ping 不通」常见：Windows 防火墙禁止 ICMP，不代表 Prometheus 抓不到；以 curl /actuator/prometheus 为准。
+  # Windows 防火墙需放行各业务端口（8080/8081/…）入站；curl ... | head 若报 Failed writing body 是管道被 head 提前关掉，可忽略。
+  # ---------------------------------------------------------------------------
+
+  - job_name: hmall-services-windows
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets:
-          - hm-gateway:8080
-          - item-service:8081
-          - cart-service:8082
-          - user-service:8084
-          - trade-service:8085
-          - pay-service:8086
-          - promotion-service:8087
-          - ai-assistant-service:8090
+      - targets: ['192.168.116.1:8080']
+        labels:
+          service: hm-gateway
+          env: windows-host
+      - targets: ['192.168.116.1:8081']
+        labels:
+          service: item-service
+          env: windows-host
+      - targets: ['192.168.116.1:8082']
+        labels:
+          service: cart-service
+          env: windows-host
+      - targets: ['192.168.116.1:8084']
+        labels:
+          service: user-service
+          env: windows-host
+      - targets: ['192.168.116.1:8085']
+        labels:
+          service: trade-service
+          env: windows-host
+      - targets: ['192.168.116.1:8086']
+        labels:
+          service: pay-service
+          env: windows-host
+      - targets: ['192.168.116.1:8087']
+        labels:
+          service: promotion-service
+          env: windows-host
+      - targets: ['192.168.116.1:8090']
+        labels:
+          service: ai-assistant-service
+          env: windows-host
+      
 
-  # 若观测栈仅在虚拟机（如 192.168.116.130）上跑、微服务在 Windows 本机跑，
-  # 请在「从虚拟机可 ping 通」的宿主机 IP 上填端口，并取消注释（promotion 双实例则再加一行 :8088）。
-  # - job_name: hmall-services-on-host
+
+
+  # - job_name: hmall-services-windows
+  #   metrics_path: /actuator/prometheus
+  #   static_configs:
+  #     - targets: 
+  #         - 192.168.116.1:8080 # hm-gateway
+  #         - 192.168.116.1:8081 # item-service
+  #         - 192.168.116.1:8082 # cart-service
+  #         - 192.168.116.1:8084 # user-service
+  #         - 192.168.116.1:8085 # trade-service
+  #         - 192.168.116.1:8086 # pay-service
+  #         - 192.168.116.1:8087 # promotion-service
+  #         - 192.168.116.1:8090 # ai-assistant-service
+  #       labels:
+  #         env: windows-host
+
+  # ---------------------------------------------------------------------------
+  # 若微服务与 Prometheus 都在同一 Docker 网络 hmall 内（compose 服务名可解析），再启用下面 job。
+  # 与「仅 Windows 本机跑业务」场景二选一，同时启用会在 /targets 里多一组（可能全 DOWN）。
+  # ---------------------------------------------------------------------------
+  # - job_name: hmall-services-docker
   #   metrics_path: /actuator/prometheus
   #   static_configs:
   #     - targets:
-  #         - 192.168.116.1:8080
-  #         - 192.168.116.1:8081
-  #         - 192.168.116.1:8082
-  #         - 192.168.116.1:8084
-  #         - 192.168.116.1:8085
-  #         - 192.168.116.1:8086
-  #         - 192.168.116.1:8087
-  #         - 192.168.116.1:8090
+  #         - hm-gateway:8080
+  #         - item-service:8081
+  #         - cart-service:8082
+  #         - user-service:8084
+  #         - trade-service:8085
+  #         - pay-service:8086
+  #         - promotion-service:8087
+  #         - ai-assistant-service:8090

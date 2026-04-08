@@ -358,7 +358,9 @@ volumes:
   hmall_mysql_data:
   hmall_redis_data:
 
+# 固定为 hmall，便于与 docker-compose.observability.yml 共用同一网络（Prometheus 才能解析 item-service 等 compose 服务名）
 networks:
   hmall-net:
+    name: hmall
     driver: bridge
 
