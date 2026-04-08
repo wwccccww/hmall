@@ -1,0 +1,20 @@
+# 可观测性：Prometheus 抓取、Sleuth 采样、Zipkin 协议上报至 Tempo（compose 映射 9411）。
+# 观测栈在虚拟机（示例 192.168.116.130）而微服务在本机时，默认可连 Tempo；与观测容器同 Docker 网络联调时设 TEMPO_HOST=tempo。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+spring:
+  sleuth:
+    sampler:
+      probability: 1.0
+  zipkin:
+    base-url: http://${TEMPO_HOST:192.168.116.130}:9411

@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # 微服务与 Prometheus 同 Docker 网络且主机名为下列服务名时生效。
+  - job_name: hmall-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - hm-gateway:8080
+          - item-service:8081
+          - cart-service:8082
+          - user-service:8084
+          - trade-service:8085
+          - pay-service:8086
+          - promotion-service:8087
+          - ai-assistant-service:8090
+
+  # 若观测栈仅在虚拟机（如 192.168.116.130）上跑、微服务在 Windows 本机跑，
+  # 请在「从虚拟机可 ping 通」的宿主机 IP 上填端口，并取消注释（promotion 双实例则再加一行 :8088）。
+  # - job_name: hmall-services-on-host
+  #   metrics_path: /actuator/prometheus
+  #   static_configs:
+  #     - targets:
+  #         - 192.168.116.1:8080
+  #         - 192.168.116.1:8081
+  #         - 192.168.116.1:8082
+  #         - 192.168.116.1:8084
+  #         - 192.168.116.1:8085
+  #         - 192.168.116.1:8086
+  #         - 192.168.116.1:8087
+  #         - 192.168.116.1:8090

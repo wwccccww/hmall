@@ -1,0 +1,87 @@
+# 可观测性栈：与主 compose 同项目网络并联使用
+# 启动：docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+# 外部网络默认名：hmall（与 docker network ls 一致；若不同请改下方 networks.hmall-net.name）
+#
+# 若本文件仅在虚拟机（如 192.168.116.130）上启动，从局域网浏览器访问（端口映射到虚拟机）：
+#   Grafana    http://192.168.116.130:3000   （默认 admin/admin）
+#   Prometheus http://192.168.116.130:9090
+#   Loki API   http://192.168.116.130:3100
+#   Tempo HTTP http://192.168.116.130:3200 ；Zipkin 接收（Sleuth 上报）http://192.168.116.130:9411
+# Promtail 无常用浏览器端口，日志经其写入 Loki；Grafana 内数据源仍用容器名 prometheus/loki/tempo（同网络互通）。
+
+services:
+  tempo:
+    image: grafana/tempo:2.4.2
+    container_name: hmall-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./docker/observability/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "9411:9411"
+    networks:
+      - hmall-net
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: hmall-loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    networks:
+      - hmall-net
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: hmall-promtail
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./docker/observability/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # 方案A：虚拟机挂载 Windows SMB 共享后的目录（示例 /mnt/hmall），供 promtail 采集本机（Windows）运行的微服务日志文件
+      # 你当前已通过 VMware 共享目录挂载到：/mnt/hgfs
+      - /mnt/hgfs:/host-hmall:ro
+    depends_on:
+      - loki
+    networks:
+      - hmall-net
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: hmall-prometheus
+    volumes:
+      - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - hmall-net
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: hmall-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - hmall-net
+
+networks:
+  hmall-net:
+    external: true
+    name: hmall
+
+volumes:
+  grafana-data:

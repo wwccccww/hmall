@@ -19,6 +19,10 @@ hm:
 spring:
   application:
     name: user-service
+  # Spring Boot 2.6+ 默认 PathPatternParser，与 Springfox（knife4j-openapi2）不兼容，会 NPE 导致 documentationPluginsBootstrapper 启动失败
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
   output:
     ansi:
       enabled: ALWAYS

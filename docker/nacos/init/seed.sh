@@ -19,6 +19,7 @@ put_config() {
 put_config "shared-jdbc.yaml" /init/shared-jdbc.yaml
 put_config "shared-log.yaml" /init/shared-log.yaml
 put_config "shared-swagger.yaml" /init/shared-swagger.yaml
+put_config "shared-observability.yaml" /init/shared-observability.yaml
 put_config "shared-seata.yaml" /init/shared-seata.yaml
 put_config "gateway-routes.json" /init/gateway-routes.json
 

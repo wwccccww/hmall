@@ -1,0 +1,33 @@
+server:
+  http_listen_port: 9081
+  grpc_listen_port: 0
+
+positions:
+  filename: D:/1study/study/java/program/hmall/docker/observability/promtail-positions.yaml
+
+clients:
+  # 推送到虚拟机 Loki（按需修改 IP/端口）
+  - url: http://192.168.116.130:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: windows-file-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: windows-file-logs
+          # 采集所有微服务写到文件的 JSON 日志（logback-spring.xml 的 FILE_JSON）
+          # 按需修改为你的实际 workspace 路径
+          __path__: D:/1study/study/java/program/hmall/**/logs/**/spring.log
+
+    pipeline_stages:
+      # FILE_JSON 是 JSON，每行含 {"service":"xxx"}，这里把 service 提为 Loki label，便于用 {service="user-service"} 查询
+      - json:
+          expressions:
+            service: service
+            level: level
+            logger: logger_name
+      - labels:
+          service:
+          level:
+
