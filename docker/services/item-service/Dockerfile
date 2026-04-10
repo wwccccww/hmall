@@ -3,7 +3,14 @@ WORKDIR /src
 COPY pom.xml ./
 COPY hm-common/pom.xml hm-common/pom.xml
 COPY item-service/pom.xml item-service/pom.xml
+COPY cart-service/pom.xml cart-service/pom.xml
+COPY user-service/pom.xml user-service/pom.xml
 COPY hm-api/pom.xml hm-api/pom.xml
+COPY trade-service/pom.xml trade-service/pom.xml
+COPY pay-service/pom.xml pay-service/pom.xml
+COPY hm-gateway/pom.xml hm-gateway/pom.xml
+COPY promotion-service/pom.xml promotion-service/pom.xml
+COPY ai-assistant-service/pom.xml ai-assistant-service/pom.xml
 COPY hm-common/src hm-common/src
 COPY item-service/src item-service/src
 COPY hm-api/src hm-api/src
@@ -15,4 +22,3 @@ COPY --from=build /src/item-service/target/item-service.jar /app/app.jar
 ENV JAVA_OPTS=""
 EXPOSE 8081
 ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app/app.jar"]
-
