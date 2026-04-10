@@ -1,0 +1,66 @@
+# 持续交付（示例）：在 GitHub 上手动触发，将各微服务镜像推送到 GHCR
+# 使用前请在仓库 Settings → Actions → General → Workflow permissions 勾选 “Read and write permissions”
+# 首次拉取：docker pull ghcr.io/<你的用户名小写>/hmall-hm-gateway:latest
+name: Publish Docker images
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "镜像标签（如 latest 或 v1.0.0）"
+        required: true
+        default: "latest"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: hm-gateway
+            dockerfile: docker/services/hm-gateway/Dockerfile
+          - service: item-service
+            dockerfile: docker/services/item-service/Dockerfile
+          - service: cart-service
+            dockerfile: docker/services/cart-service/Dockerfile
+          - service: user-service
+            dockerfile: docker/services/user-service/Dockerfile
+          - service: trade-service
+            dockerfile: docker/services/trade-service/Dockerfile
+          - service: pay-service
+            dockerfile: docker/services/pay-service/Dockerfile
+          - service: promotion-service
+            dockerfile: docker/services/promotion-service/Dockerfile
+          - service: ai-assistant-service
+            dockerfile: docker/services/ai-assistant-service/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 镜像名（owner 小写）
+        id: meta
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ github.event.inputs.tag }}
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
