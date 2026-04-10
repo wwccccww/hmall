@@ -77,11 +77,17 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    # 部分 nacos/nacos-server 镜像无 wget；首次连 MySQL 启动较慢，start_period 内失败不计入 unhealthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8848/nacos/actuator/health | grep -q UP"]
-      interval: 5s
-      timeout: 5s
-      retries: 60
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -o /dev/null http://127.0.0.1:8848/nacos/v1/console/health/readiness || curl -sf -o /dev/null http://127.0.0.1:8848/nacos/actuator/health || wget -q --spider http://127.0.0.1:8848/nacos/ || bash -c 'echo >/dev/tcp/127.0.0.1/8848'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 45
+      start_period: 180s
     networks:
       - hmall-net
 
@@ -361,6 +367,6 @@ volumes:
 # 固定为 hmall，便于与 docker-compose.observability.yml 共用同一网络（Prometheus 才能解析 item-service 等 compose 服务名）
 networks:
   hmall-net:
-    name: hmall
+    name: hmall_new
     driver: bridge
 
