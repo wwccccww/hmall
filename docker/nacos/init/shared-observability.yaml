@@ -4,17 +4,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,prometheus # 暴露哪些endpoint，供外部探测/监控，例如prometheus采集
   endpoint:
     health:
-      show-details: when_authorized
+      show-details: when_authorized # 健康检查详情仅授权时可见
   metrics:
     tags:
-      application: ${spring.application.name}
+      application: ${spring.application.name} # Metrics加上应用名标签
 
 spring:
   sleuth:
     sampler:
-      probability: 1.0
+      probability: 1.0 # 采样比例，1.0表示全部请求都会被trace跟踪
   zipkin:
-    base-url: http://${TEMPO_HOST:192.168.116.130}:9411
+    base-url: http://${TEMPO_HOST:192.168.116.130}:9411 # Trace数据上报到 Tempo/Zipkin，这里端口9411

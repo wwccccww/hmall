@@ -1,0 +1,40 @@
+# 与 docker-compose.yml 叠加：业务镜像从 GHCR 拉取（不在服务器上 Maven 构建）
+#
+# 服务器上需：docker login ghcr.io（read:packages 的 PAT）
+# 环境变量：
+#   GHCR_OWNER — GitHub 用户名或组织名的小写（与镜像路径一致）
+#   HMALL_IMAGE_TAG — 与 Publish 工作流打的标签一致，如 latest 或某次提交的完整 SHA
+#
+# 示例：
+#   export GHCR_OWNER=你的github登录名小写
+#   export HMALL_IMAGE_TAG=latest
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+
+services:
+  hm-gateway:
+    image: ghcr.io/${GHCR_OWNER}/hmall-hm-gateway:${HMALL_IMAGE_TAG:-latest}
+
+  item-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-item-service:${HMALL_IMAGE_TAG:-latest}
+
+  cart-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-cart-service:${HMALL_IMAGE_TAG:-latest}
+
+  user-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-user-service:${HMALL_IMAGE_TAG:-latest}
+
+  trade-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-trade-service:${HMALL_IMAGE_TAG:-latest}
+
+  pay-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-pay-service:${HMALL_IMAGE_TAG:-latest}
+
+  promotion-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-promotion-service:${HMALL_IMAGE_TAG:-latest}
+
+  promotion-service-2:
+    image: ghcr.io/${GHCR_OWNER}/hmall-promotion-service:${HMALL_IMAGE_TAG:-latest}
+
+  ai-assistant-service:
+    image: ghcr.io/${GHCR_OWNER}/hmall-ai-assistant-service:${HMALL_IMAGE_TAG:-latest}
