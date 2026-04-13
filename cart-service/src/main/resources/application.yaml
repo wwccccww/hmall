@@ -16,6 +16,13 @@ hm:
     pw: 123
 
 spring:
+  application:
+    name: cart-service
+  datasource:
+    url: jdbc:mysql://${hm.db.host}:3306/${hm.db.database}?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: ${hm.db.pw}
   output:
     ansi:
       enabled: ALWAYS
@@ -30,3 +37,11 @@ feign:
     enabled: true
   okhttp:
     enabled: true # 开启OKHttp功能
+
+mybatis-plus:
+  configuration:
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
+  global-config:
+    db-config:
+      update-strategy: not_null
+      id-type: auto
