@@ -113,6 +113,8 @@ services:
   # 以下三项与虚拟机里「单独起的」Seata/ES/Kibana 二选一即可：若宿主机已占用 8091/9200/5601，请改 ports 或停掉旧容器，避免端口冲突。
   # Linux 上 ES 若报 vm.max_map_count，宿主机执行：sysctl -w vm.max_map_count=262144
   # 若坚持用宿主机已有实例：可删掉对应 service，并为业务容器配置 extra_hosts: ["host.docker.internal:host-gateway"]，再把 HM_ES_HOST / HM_AI_KNOWLEDGE_ES_HOST 等指向 host.docker.internal。
+  # 自检是否在 Nacos 注册：docker exec hmall-seata-server curl -s "http://nacos:8848/nacos/v1/ns/instance/list?serviceName=seata-server&groupName=DEFAULT_GROUP&namespaceId="
+  # 宿主机上勿用主机名 nacos，应：curl -s "http://127.0.0.1:8848/nacos/v1/ns/instance/list?..."
   seata-server:
     image: seataio/seata-server:1.5.2
     container_name: hmall-seata-server
@@ -123,8 +125,6 @@ services:
       SEATA_PORT: "8091"
       STORE_MODE: file
       SEATA_CONFIG_NAME: file:/root/seata-config/registry
-      # 注册到 Nacos 的可达地址；默认可注册成容器内 IP，若仍无法发现可改为 compose 服务名
-      SEATA_IP: seata-server
     volumes:
       - ./docker/seata:/root/seata-config:ro
     depends_on:
