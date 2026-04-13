@@ -19,6 +19,7 @@ RUN mvn -q -pl item-service -am package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /src/item-service/target/item-service.jar /app/app.jar
-ENV JAVA_OPTS=""
+# Seata 依赖旧版 CGLIB，JDK17+ 需放开 java.lang 反射，否则 GlobalTransactionScanner 初始化报 InaccessibleObjectException
+ENV JAVA_OPTS="--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
 EXPOSE 8081
 ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app/app.jar"]
