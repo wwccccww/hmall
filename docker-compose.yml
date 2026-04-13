@@ -125,11 +125,9 @@ services:
     environment:
       SEATA_PORT: "8091"
       STORE_MODE: file
-      # 1.5.2 Spring Boot 进程实际读的是镜像内 /seata-server/resources/registry.conf；
-      # 仅设 SEATA_CONFIG_NAME 指向 /root/seata-config 时可能不会生效，导致一直用内置 file 注册中心、不向 Nacos 注册。
+      # 1.5.2 为 Spring Boot：注册中心由 classpath application.yml 的 seata.registry 决定，registry.conf 不生效。
     volumes:
-      - ./docker/seata/registry.conf:/seata-server/resources/registry.conf:ro
-      - ./docker/seata/file.conf:/seata-server/resources/file.conf:ro
+      - ./docker/seata/application.yml:/seata-server/config/application.yml:ro
     depends_on:
       nacos:
         condition: service_healthy

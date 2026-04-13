@@ -1,0 +1,16 @@
+# Seata Server 1.5.2+ 为 Spring Boot，实际生效的是 application.yml 里的 seata.registry，
+# 镜像内置默认 seata.registry.type=file，故不会向 Nacos 注册；本文件挂载到 /seata-server/config/ 覆盖之。
+# 与业务端 shared-seata.yaml：application=seata-server、group=DEFAULT_GROUP、cluster=default。
+seata:
+  server:
+    service-port: 8091
+  registry:
+    type: nacos
+    nacos:
+      application: seata-server
+      server-addr: nacos:8848
+      group: DEFAULT_GROUP
+      namespace: ""
+      cluster: default
+      username: ""
+      password: ""
