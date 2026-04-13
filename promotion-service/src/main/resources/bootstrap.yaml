@@ -5,7 +5,7 @@ spring:
     active: local
   cloud:
     nacos:
-      server-addr: 192.168.116.130
+      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:192.168.116.130:8848}
       config:
         file-extension: yaml
         shared-configs:

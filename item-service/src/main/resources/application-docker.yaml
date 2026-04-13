@@ -1,0 +1,6 @@
+# Docker Compose：勿向 Nacos 注册宿主机 NAT IP，使用容器在 hmall 网络中的地址。
+spring:
+  cloud:
+    nacos:
+      discovery:
+        ip: ~

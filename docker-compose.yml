@@ -215,7 +215,7 @@ services:
       dockerfile: docker/services/item-service/Dockerfile
     container_name: hmall-item-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
       SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
@@ -246,7 +246,7 @@ services:
       dockerfile: docker/services/cart-service/Dockerfile
     container_name: hmall-cart-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
       SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
@@ -272,7 +272,7 @@ services:
       dockerfile: docker/services/user-service/Dockerfile
     container_name: hmall-user-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
       SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
@@ -366,7 +366,7 @@ services:
       dockerfile: docker/services/promotion-service/Dockerfile
     container_name: hmall-promotion-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
       SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
@@ -399,7 +399,7 @@ services:
       dockerfile: docker/services/promotion-service/Dockerfile
     container_name: hmall-promotion-service-2
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
       SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
@@ -433,7 +433,7 @@ services:
       dockerfile: docker/services/ai-assistant-service/Dockerfile
     container_name: hmall-ai-assistant-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
       SPRING_SLEUTH_ENABLED: "false"
       HM_AI_LLM_BASE_URL: ${HM_AI_LLM_BASE_URL:-https://api.openai.com}

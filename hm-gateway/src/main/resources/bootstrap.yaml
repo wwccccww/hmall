@@ -3,7 +3,8 @@ spring:
     name: gateway
   cloud:
     nacos:
-      server-addr: 192.168.116.130
+      # 与 discovery 一致；勿写死宿主机 IP，否则 Nacos2 gRPC 会连 192.168.x.x:9848 而 compose 常未映射该端口
+      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:192.168.116.130:8848}
       config:
         file-extension: yaml
         shared-configs:

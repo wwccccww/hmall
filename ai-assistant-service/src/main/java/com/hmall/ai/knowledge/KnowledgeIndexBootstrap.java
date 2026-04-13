@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Component
 @Order(Integer.MAX_VALUE)
-@ConditionalOnBean(KnowledgeIndexerService.class)
+@ConditionalOnBean({KnowledgeIndexerService.class, KnowledgeEsIndexService.class})
 @RequiredArgsConstructor
 public class KnowledgeIndexBootstrap implements ApplicationRunner {
 

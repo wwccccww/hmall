@@ -3,7 +3,8 @@ package com.hmall.ai.knowledge;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.elasticsearch.client.RestHighLevelClient;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.DependsOn;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.index.IndexRequest;
@@ -32,7 +33,8 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@ConditionalOnBean(RestHighLevelClient.class)
+@DependsOn("knowledgeElasticsearchClient")
+@ConditionalOnProperty(prefix = "hm.ai.knowledge", name = "enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class KnowledgeEsIndexService {
 

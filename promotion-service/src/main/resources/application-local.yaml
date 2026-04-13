@@ -12,11 +12,11 @@ hm:
 spring:
   cloud:
     nacos:
-      server-addr: 192.168.116.130:8848
+      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:192.168.116.130:8848}
   redis:
-    host: 192.168.116.130
-    port: 6379
-    password: 123456
+    host: ${SPRING_REDIS_HOST:192.168.116.130}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:123456}
     # password: 123321   # 若 Redis 设置了密码，取消注释并填写
     lettuce:
       pool:
@@ -25,9 +25,9 @@ spring:
         min-idle: 0
         max-wait: 100ms
   rabbitmq:
-    host: 192.168.116.130
-    port: 5672
-    username: sail
-    password: 123
-    virtual-host: /hmall
+    host: ${SPRING_RABBITMQ_HOST:192.168.116.130}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:sail}
+    password: ${SPRING_RABBITMQ_PASSWORD:123}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/hmall}
 
