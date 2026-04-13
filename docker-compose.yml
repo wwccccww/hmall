@@ -71,6 +71,7 @@ services:
       JVM_XMS: 256m
       JVM_XMX: 256m
       JVM_XMN: 128m
+      # 关闭鉴权时勿在 shared-seata / Seata registry.conf 中写 nacos 账号，否则客户端调登录接口易 500
       NACOS_AUTH_ENABLE: "false"
     ports:
       - "8848:8848"

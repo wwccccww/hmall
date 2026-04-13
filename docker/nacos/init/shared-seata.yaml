@@ -19,8 +19,10 @@ seata:
       namespace: ""
       group: DEFAULT_GROUP
       application: seata-server
-      username: nacos
-      password: nacos
+      # Nacos 未开启鉴权（如 compose 中 NACOS_AUTH_ENABLE=false）时不要填账号，否则会请求 /v1/auth/users/login 报错。
+      # 开启鉴权后通过环境变量注入：NACOS_USERNAME、NACOS_PASSWORD（或在各服务里配置同名占位符）
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
   service:
     vgroup-mapping:
       hmall: default
