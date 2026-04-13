@@ -108,17 +108,91 @@ services:
     networks:
       - hmall-net
 
+  # 以下三项与虚拟机里「单独起的」Seata/ES/Kibana 二选一即可：若宿主机已占用 8091/9200/5601，请改 ports 或停掉旧容器，避免端口冲突。
+  # Linux 上 ES 若报 vm.max_map_count，宿主机执行：sysctl -w vm.max_map_count=262144
+  # 若坚持用宿主机已有实例：可删掉对应 service，并为业务容器配置 extra_hosts: ["host.docker.internal:host-gateway"]，再把 HM_ES_HOST / HM_AI_KNOWLEDGE_ES_HOST 等指向 host.docker.internal。
+  seata-server:
+    image: seataio/seata-server:1.5.2
+    container_name: hmall-seata-server
+    hostname: seata-server
+    ports:
+      - "8091:8091"
+    environment:
+      SEATA_PORT: "8091"
+      STORE_MODE: file
+      SEATA_CONFIG_NAME: file:/root/seata-config/registry
+    volumes:
+      - ./docker/seata:/root/seata-config:ro
+    depends_on:
+      nacos:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8091' || exit 1",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 36
+      start_period: 45s
+    networks:
+      - hmall-net
+
+  elasticsearch:
+    image: elasticsearch:7.12.1
+    container_name: hmall-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - hmall_es_data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+    networks:
+      - hmall-net
+
+  kibana:
+    image: kibana:7.12.1
+    container_name: hmall-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - hmall-net
+
   hm-gateway:
     build:
       context: .
       dockerfile: docker/services/hm-gateway/Dockerfile
     container_name: hmall-gateway
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      # docker：覆盖 application-local 中的宿主机 Redis/Nacos；并关闭 Sleuth（compose 未起 Tempo/Zipkin）
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
+      SPRING_SLEUTH_ENABLED: "false"
     ports:
       - "8080:8080"
     depends_on:
@@ -137,8 +211,10 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
+      HM_ES_HOST: elasticsearch
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
@@ -151,6 +227,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      seata-server:
+        condition: service_healthy
     networks:
       - hmall-net
 
@@ -162,6 +242,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -187,6 +268,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -210,8 +292,9 @@ services:
       dockerfile: docker/services/trade-service/Dockerfile
     container_name: hmall-trade-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -233,6 +316,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      seata-server:
+        condition: service_healthy
     networks:
       - hmall-net
 
@@ -242,8 +327,9 @@ services:
       dockerfile: docker/services/pay-service/Dockerfile
     container_name: hmall-pay-service
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: local,docker
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -276,6 +362,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -308,6 +395,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_DB_HOST: mysql
       HM_DB_PW: ${MYSQL_ROOT_PASSWORD:-123}
       SPRING_REDIS_HOST: redis
@@ -341,6 +429,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_NACOS_SERVER_ADDR: nacos:8848
+      SPRING_SLEUTH_ENABLED: "false"
       HM_AI_LLM_BASE_URL: ${HM_AI_LLM_BASE_URL:-https://api.openai.com}
       HM_AI_LLM_API_KEY: ${HM_AI_LLM_API_KEY:-}
       HM_AI_LLM_MODEL: ${HM_AI_LLM_MODEL:-gpt-4o-mini}
@@ -348,6 +437,7 @@ services:
       HM_AI_ITEM_BASE_URL: ${HM_AI_ITEM_BASE_URL:-http://item-service:8081}
       HM_AI_PROMOTION_BASE_URL: ${HM_AI_PROMOTION_BASE_URL:-http://promotion-service:8087}
       HM_AI_RAG_USE_ES: ${HM_AI_RAG_USE_ES:-true}
+      HM_AI_KNOWLEDGE_ES_HOST: elasticsearch
       HM_AI_RAG_SEARCH_TOP_K: ${HM_AI_RAG_SEARCH_TOP_K:-20}
       HM_AI_RAG_PROMPT_MAX_ITEMS: ${HM_AI_RAG_PROMPT_MAX_ITEMS:-12}
       HM_AI_BAILIAN_APP_ID: ${HM_AI_BAILIAN_APP_ID:-}
@@ -357,12 +447,15 @@ services:
     depends_on:
       nacos:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - hmall-net
 
 volumes:
   hmall_mysql_data:
   hmall_redis_data:
+  hmall_es_data:
 
 # 固定为 hmall，便于与 docker-compose.observability.yml 共用同一网络（Prometheus 才能解析 item-service 等 compose 服务名）
 networks:

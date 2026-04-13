@@ -14,7 +14,8 @@ seata:
   registry:
     type: nacos
     nacos:
-      server-addr: 192.168.116.130:8848
+      # 与微服务一致：Compose 内置 Nacos 用 nacos:8848；虚拟机单机可设 SPRING_CLOUD_NACOS_SERVER_ADDR 或沿用默认
+      server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:192.168.116.130:8848}
       namespace: ""
       group: DEFAULT_GROUP
       application: seata-server

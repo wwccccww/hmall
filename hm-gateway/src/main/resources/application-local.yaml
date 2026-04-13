@@ -1,10 +1,10 @@
 spring:
   redis:
-    host: 192.168.116.130
-    port: 6379
-    password: 123456
+    host: ${SPRING_REDIS_HOST:${REDIS_HOST:192.168.116.130}}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:123456}
   cloud:
     nacos:
       discovery:
-        server-addr: 192.168.116.130:8848
-        ip: 192.168.116.1
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:192.168.116.130:8848}
+        ip: ${SPRING_CLOUD_NACOS_DISCOVERY_IP:192.168.116.1}

@@ -1,0 +1,6 @@
+# Docker：避免向 Nacos 注册宿主机 NAT IP（如 192.168.116.1），实例地址应在 hmall 网络内可达。
+spring:
+  cloud:
+    nacos:
+      discovery:
+        ip: ~

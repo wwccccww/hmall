@@ -1,0 +1,12 @@
+# Docker Compose：覆盖 application-local 中的宿主机地址，使用服务名访问 Redis/Nacos。
+spring:
+  redis:
+    host: ${SPRING_REDIS_HOST:redis}
+    port: ${SPRING_REDIS_PORT:6379}
+    password: ${SPRING_REDIS_PASSWORD:123456}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${SPRING_CLOUD_NACOS_SERVER_ADDR:nacos:8848}
+        # 勿注册宿主机 NAT IP，否则容器内实例地址不可达
+        ip: ~

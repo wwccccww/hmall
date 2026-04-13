@@ -1,0 +1,6 @@
+# 与虚拟机 local 不同：容器内应注册本容器在 bridge 网络中的 IP。
+spring:
+  cloud:
+    nacos:
+      discovery:
+        ip: ~
