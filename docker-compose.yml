@@ -102,6 +102,7 @@ services:
     entrypoint: ["/bin/sh", "/init/seed.sh"]
     environment:
       NACOS_ADDR: http://nacos:8848
+      # 填 public 时 seed 脚本会省略 tenant，与控制台「public」一致；勿改成随意字符串除非已建对应命名空间 ID
       NACOS_NS: public
       NACOS_GROUP: DEFAULT_GROUP
     restart: "no"
