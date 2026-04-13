@@ -123,6 +123,8 @@ services:
       SEATA_PORT: "8091"
       STORE_MODE: file
       SEATA_CONFIG_NAME: file:/root/seata-config/registry
+      # 注册到 Nacos 的可达地址；默认可注册成容器内 IP，若仍无法发现可改为 compose 服务名
+      SEATA_IP: seata-server
     volumes:
       - ./docker/seata:/root/seata-config:ro
     depends_on:
