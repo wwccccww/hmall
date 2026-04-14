@@ -201,7 +201,9 @@ services:
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
       SPRING_SLEUTH_ENABLED: "false"
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      # JDK17+ 下 Seata/CGLIB 等会触发反射访问限制，需开放模块访问（避免 InaccessibleObjectException）
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     ports:
       - "8080:8080"
     logging:
@@ -233,7 +235,8 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -269,7 +272,8 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -301,7 +305,8 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -338,7 +343,8 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
       SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -379,7 +385,8 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
       SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -418,7 +425,8 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
       SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -457,7 +465,8 @@ services:
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-sail}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-123}
       SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/hmall}
-      JAVA_OPTS: "--server.port=8088 --spring.application.instance-id=promotion-8088 -Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --server.port=8088 --spring.application.instance-id=promotion-8088 -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
@@ -498,7 +507,8 @@ services:
       HM_AI_RAG_PROMPT_MAX_ITEMS: ${HM_AI_RAG_PROMPT_MAX_ITEMS:-12}
       HM_AI_BAILIAN_APP_ID: ${HM_AI_BAILIAN_APP_ID:-}
       HM_AI_BAILIAN_ENDPOINT_BASE: ${HM_AI_BAILIAN_ENDPOINT_BASE:-https://dashscope.aliyuncs.com}
-      JAVA_OPTS: "-Xms128m -Xmx256m"
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED -Xms128m -Xmx256m"
     logging:
       driver: "json-file"
       options:
