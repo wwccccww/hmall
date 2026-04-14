@@ -43,6 +43,12 @@ const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
 const isLoggedIn = computed(() => !!userStore.token)
 
+const formatYuanFromFen = (fen) => {
+  const n = Number(fen)
+  if (!Number.isFinite(n)) return '0.00'
+  return (n / 100).toFixed(2)
+}
+
 const logout = () => {
   userStore.clearUserInfo()
   router.push('/login')
@@ -138,7 +144,7 @@ onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
               </div>
               <div class="flex flex-col">
                 <span class="text-[11px] font-bold uppercase tracking-widest text-gray-900 leading-tight">{{ userInfo.username }}</span>
-                <span v-if="userInfo.balance !== undefined" class="text-[10px] text-gray-500 font-medium">余额: ¥{{ userInfo.balance / 100 }}</span>
+                <span v-if="userInfo.balance !== undefined" class="text-[10px] text-gray-500 font-medium">余额: ¥{{ formatYuanFromFen(userInfo.balance) }}</span>
               </div>
               <button @click="logout" class="text-[10px] ml-2 font-bold uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors">退出</button>
             </div>

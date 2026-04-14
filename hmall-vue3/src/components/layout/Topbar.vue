@@ -15,6 +15,12 @@ const userInfo = computed(() => storeUser.value ?? GUEST_USER_DISPLAY)
 
 const isAdmin = computed(() => userStore.isAdmin)
 
+const formatYuanFromFen = (fen) => {
+  const n = Number(fen)
+  if (!Number.isFinite(n)) return '0.00'
+  return (n / 100).toFixed(2)
+}
+
 const handleLogout = () => {
   userStore.clearUserInfo()
   router.push('/admin-login')
@@ -71,7 +77,7 @@ const handleLogout = () => {
                    <ShieldCheck :size="9" stroke-width="2.5" />Admin
                  </span>
                </div>
-               <p v-if="userInfo.balance !== undefined" class="text-[11px] text-gray-500 mt-1 font-medium italic">账户余额: ¥{{ userInfo.balance / 100 }}</p>
+               <p v-if="userInfo.balance !== undefined" class="text-[11px] text-gray-500 mt-1 font-medium italic">账户余额: ¥{{ formatYuanFromFen(userInfo.balance) }}</p>
             </div>
             <div class="py-2 px-2">
                <a href="#" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-black transition-colors">

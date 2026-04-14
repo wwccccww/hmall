@@ -57,7 +57,7 @@ const handlePay = async () => {
     if (payOrderNo.value) {
       await payOrder(payOrderNo.value, {
         id: payOrderNo.value,
-        pw: '123' // 测试密码
+        pw: '123456' // 测试密码：与初始化用户（jack/admin）的默认密码一致
       })
       
       // 支付成功后，立即拉取最新的用户信息（包括余额）并同步到缓存
