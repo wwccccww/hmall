@@ -24,21 +24,21 @@ scrape_configs:
         target_label: container
 
   # 方案A：采集「Windows 本机运行的微服务」写到文件的日志（需先将 Windows 目录通过 SMB 挂载到虚拟机 /mnt/hmall，并在 compose 中映射为 /host-hmall）
-  - job_name: windows-host-logs
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: windows-host-logs
-          __path__: /host-hmall/**/logs/**/spring.log
+  # - job_name: windows-host-logs
+  #   static_configs:
+  #     - targets:
+  #         - localhost
+  #       labels:
+  #         job: windows-host-logs
+  #         __path__: /host-hmall/**/logs/**/spring.log
 
-    pipeline_stages:
-      # FILE_JSON 每行包含 {"service":"xxx"}，这里提取并转成 label，便于用 {service="user-service"} 查询
-      - json:
-          expressions:
-            service: service
-            level: level
-            logger_name: logger_name
-      - labels:
-          service:
-          level:
+  #   pipeline_stages:
+  #     # FILE_JSON 每行包含 {"service":"xxx"}，这里提取并转成 label，便于用 {service="user-service"} 查询
+  #     - json:
+  #         expressions:
+  #           service: service
+  #           level: level
+  #           logger_name: logger_name
+  #     - labels:
+  #         service:
+  #         level:
