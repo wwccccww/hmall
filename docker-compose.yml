@@ -75,6 +75,8 @@ services:
       NACOS_AUTH_ENABLE: "false"
     ports:
       - "8848:8848"
+      # Nacos 2.x 客户端 gRPC（8848+1000）；仅映射 8848 时，宿主机上的 Spring 连配置中心会卡在 9848 超时
+      - "9848:9848"
     depends_on:
       mysql:
         condition: service_healthy
