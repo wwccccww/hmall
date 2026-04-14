@@ -18,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 
 /**
  * <p>
@@ -43,7 +42,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String password = loginDTO.getPassword();
         // 2.根据用户名或手机号查询
         User user = lambdaQuery().eq(User::getUsername, username).one();
-        Assert.notNull(user, "用户名错误");
+        if (user == null) {
+            throw new BadRequestException("用户名错误");
+        }
         // 3.校验是否禁用
         if (user.getStatus() == UserStatus.FROZEN) {
             throw new ForbiddenException("用户被冻结");

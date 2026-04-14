@@ -81,7 +81,7 @@ services:
 # 与主工程 docker-compose.yml 使用同一桥接网络名 hmall（勿再用 external，否则会与业务栈脱节导致 Prometheus 报 no such host）
 networks:
   hmall-net:
-    name: hmall
+    name: hmall_new
     driver: bridge
 
 volumes:

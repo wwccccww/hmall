@@ -67,15 +67,15 @@ scrape_configs:
   # 若微服务与 Prometheus 都在同一 Docker 网络 hmall 内（compose 服务名可解析），再启用下面 job。
   # 与「仅 Windows 本机跑业务」场景二选一，同时启用会在 /targets 里多一组（可能全 DOWN）。
   # ---------------------------------------------------------------------------
-  # - job_name: hmall-services-docker
-  #   metrics_path: /actuator/prometheus
-  #   static_configs:
-  #     - targets:
-  #         - hm-gateway:8080
-  #         - item-service:8081
-  #         - cart-service:8082
-  #         - user-service:8084
-  #         - trade-service:8085
-  #         - pay-service:8086
-  #         - promotion-service:8087
-  #         - ai-assistant-service:8090
+  - job_name: hmall-services-docker
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - hm-gateway:8080
+          - item-service:8081
+          - cart-service:8082
+          - user-service:8084
+          - trade-service:8085
+          - pay-service:8086
+          - promotion-service:8087
+          - ai-assistant-service:8090
