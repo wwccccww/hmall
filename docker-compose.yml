@@ -465,7 +465,7 @@ volumes:
   hmall_redis_data:
   hmall_es_data:
 
-# 固定为 hmall，便于与 docker-compose.observability.yml 共用同一网络（Prometheus 才能解析 item-service 等 compose 服务名）
+# 外部网络名默认 hmall_new，与 docker-compose.observability.yml 一致（Prometheus 才能解析 item-service 等 compose 服务名）
 networks:
   hmall-net:
     name: hmall_new

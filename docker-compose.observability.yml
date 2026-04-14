@@ -1,6 +1,6 @@
 # 可观测性栈：与主 compose 同项目网络并联使用
 # 启动：docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
-# 外部网络默认名：hmall（与 docker network ls 一致；若不同请改下方 networks.hmall-net.name）
+# 外部网络须与主栈一致（默认 hmall_new，见 docker-compose.yml 末尾 networks.hmall-net.name）
 #
 # 若本文件仅在虚拟机（如 192.168.116.130）上启动，从局域网浏览器访问（端口映射到虚拟机）：
 #   Grafana    http://192.168.116.130:3000   （默认 admin/admin）
@@ -78,7 +78,7 @@ services:
     networks:
       - hmall-net
 
-# 与主工程 docker-compose.yml 使用同一桥接网络名 hmall（勿再用 external，否则会与业务栈脱节导致 Prometheus 报 no such host）
+# 与主工程 docker-compose.yml 使用同一外部网络名（默认 hmall_new），否则 Prometheus 无法解析 item-service 等主机名
 networks:
   hmall-net:
     name: hmall_new
