@@ -164,8 +164,18 @@ jobs:
 
       - name: 镜像名（owner 小写）
         id: meta
+        shell: bash
+        env:
+          OWNER_OVERRIDE: ${{ secrets.GHCR_OWNER_LOWER }}
         run: |
-          echo "image=ghcr.io/${{ needs['compute-tag'].outputs.owner }}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          owner="${{ needs['compute-tag'].outputs.owner }}"
+          if [[ -z "${owner}" && -n "${OWNER_OVERRIDE}" ]]; then
+            owner="${OWNER_OVERRIDE}"
+          fi
+          if [[ -z "${owner}" ]]; then
+            owner="$(echo "${GITHUB_REPOSITORY}" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')"
+          fi
+          echo "image=ghcr.io/${owner}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
 
       - name: 构建并推送
         uses: docker/build-push-action@v6
@@ -195,11 +205,21 @@ jobs:
 
       - name: 为未构建服务补齐 SHA tag（从 latest 复用 manifest）
         shell: bash
+        env:
+          OWNER_OVERRIDE: ${{ secrets.GHCR_OWNER_LOWER }}
         run: |
           set -euo pipefail
           owner="${{ needs['compute-tag'].outputs.owner }}"
+          if [[ -z "${owner}" && -n "${OWNER_OVERRIDE}" ]]; then
+            owner="${OWNER_OVERRIDE}"
+          fi
+          if [[ -z "${owner}" ]]; then
+            owner="$(echo "${GITHUB_REPOSITORY}" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')"
+          fi
           tag="${{ needs['compute-tag'].outputs.tag }}"
           services=(hm-gateway item-service cart-service user-service trade-service pay-service promotion-service ai-assistant-service)
+
+          echo "Using GHCR owner: ${owner} (len=${#owner}), tag: ${tag}"
 
           # 本次实际构建的服务（JSON include -> service 列表）
           built="$(python - <<'PY'
