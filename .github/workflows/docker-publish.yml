@@ -20,7 +20,7 @@ permissions:
   packages: write
 
 jobs:
-  detect-changes:
+  compute-tag:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' ||
@@ -29,6 +29,30 @@ jobs:
         github.event.workflow_run.event == 'push' &&
         (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master')
       )
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+      owner: ${{ steps.owner.outputs.value }}
+    steps:
+      - name: 计算镜像标签
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 计算 owner（小写）
+        id: owner
+        shell: bash
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "value=${owner}" >> "$GITHUB_OUTPUT"
+
+  detect-changes:
+    needs: compute-tag
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       count: ${{ steps.set-matrix.outputs.count }}
@@ -114,7 +138,7 @@ jobs:
           PY
 
   build-push:
-    needs: detect-changes
+    needs: [compute-tag, detect-changes]
     runs-on: ubuntu-latest
     if: needs.detect-changes.outputs.count != '0'
     strategy:
@@ -137,18 +161,7 @@ jobs:
       - name: 镜像名（owner 小写）
         id: meta
         run: |
-          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "image=ghcr.io/${owner}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
-
-      - name: 计算镜像标签
-        id: tag
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "image=ghcr.io/${{ needs.compute-tag.outputs.owner }}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
 
       - name: 构建并推送
         uses: docker/build-push-action@v6
@@ -157,5 +170,57 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.tag.outputs.value }}
-            ${{ steps.meta.outputs.image }}:${{ steps.tag.outputs.value }}
+            ${{ steps.meta.outputs.image }}:${{ needs.compute-tag.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:latest
+
+  retag-unchanged:
+    needs: [compute-tag, detect-changes, build-push]
+    runs-on: ubuntu-latest
+    # 只在自动链路（CI 成功后）补齐 tag，手动发版通常就是你明确指定的 tag
+    if: github.event_name == 'workflow_run'
+    steps:
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 为未构建服务补齐 SHA tag（从 latest 复用 manifest）
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${{ needs.compute-tag.outputs.owner }}"
+          tag="${{ needs.compute-tag.outputs.tag }}"
+          services=(hm-gateway item-service cart-service user-service trade-service pay-service promotion-service ai-assistant-service)
+
+          # 本次实际构建的服务（JSON include -> service 列表）
+          built="$(python - <<'PY'
+import json, os
+matrix=json.loads(os.environ["MATRIX"])
+print("\n".join([x.get("service","") for x in matrix.get("include", []) if x.get("service")]))
+PY
+          )"
+
+          is_built() {
+            local s="$1"
+            while IFS= read -r b; do
+              [[ "$b" == "$s" ]] && return 0
+            done <<< "${built}"
+            return 1
+          }
+
+          for s in "${services[@]}"; do
+            if is_built "$s"; then
+              continue
+            fi
+            src="ghcr.io/${owner}/hmall-${s}:latest"
+            dst="ghcr.io/${owner}/hmall-${s}:${tag}"
+            echo "Retag ${src} -> ${dst}"
+            docker buildx imagetools create -t "${dst}" "${src}"
+          done
+        env:
+          MATRIX: ${{ needs.detect-changes.outputs.matrix }}
