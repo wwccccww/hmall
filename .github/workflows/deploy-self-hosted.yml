@@ -22,41 +22,62 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-      
+
+
+
+
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 计算镜像标签
-        id: tag
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-          fi
-
+      # 1. 彻底删掉 actions/checkout@v4，因为它需要连接 github.com 443 端口
+      
       - name: 执行本地部署
-        shell: bash
         run: |
-          set -e
+          # 因为你配置了 -v /root/hmall:/root/hmall
+          # 所以在容器内部，这个路径是真实存在的
+          cd /root/hmall
           
-          # 1. 进入项目目录（请确保你的虚拟机此路径下已有 docker-compose 文件）
-          # 如果路径不同，请修改此处
-          cd /root/hmall 
-          
-          # 2. 设置环境变量（供 docker-compose.ghcr.yml 使用）
-          export GHCR_OWNER="${{ secrets.GHCR_OWNER_LOWER }}"
-          export HMALL_IMAGE_TAG="${{ steps.tag.outputs.value }}"
-          
-          # 3. 登录 GHCR
+          # 2. 登录 GHCR (镜像仓库)
+          # 注意：拉取镜像走的是 Docker 协议，通常比 Git 克隆要稳
           echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_PULL_USER }}" --password-stdin
           
-          # 4. 拉取镜像并启动
-          # 注意：这里同时使用了基础配置和 GHCR 专用配置
+          # 3. 拉取并更新
           docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
           docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+
+      
+    # steps:
+    #   - name: 检出代码
+    #     uses: actions/checkout@v4
+
+    #   - name: 计算镜像标签
+    #     id: tag
+    #     shell: bash
+    #     run: |
+    #       if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+    #         echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+    #       else
+    #         echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+    #       fi
+
+    #   - name: 执行本地部署
+    #     shell: bash
+    #     run: |
+    #       set -e
           
-          # 5. 清理过期的虚悬镜像（释放虚拟机磁盘）
-          docker image prune -f
+    #       # 1. 进入项目目录（请确保你的虚拟机此路径下已有 docker-compose 文件）
+    #       # 如果路径不同，请修改此处
+    #       cd /root/hmall 
+          
+    #       # 2. 设置环境变量（供 docker-compose.ghcr.yml 使用）
+    #       export GHCR_OWNER="${{ secrets.GHCR_OWNER_LOWER }}"
+    #       export HMALL_IMAGE_TAG="${{ steps.tag.outputs.value }}"
+          
+    #       # 3. 登录 GHCR
+    #       echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_PULL_USER }}" --password-stdin
+          
+    #       # 4. 拉取镜像并启动
+    #       # 注意：这里同时使用了基础配置和 GHCR 专用配置
+    #       docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+    #       docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+          
+    #       # 5. 清理过期的虚悬镜像（释放虚拟机磁盘）
+    #       docker image prune -f
