@@ -158,6 +158,7 @@ services:
       - "9200:9200"
     volumes:
       - hmall_es_data:/usr/share/elasticsearch/data
+      - ./ik:/usr/share/elasticsearch/plugins/ik
     ulimits:
       memlock:
         soft: -1

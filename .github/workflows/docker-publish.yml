@@ -10,37 +10,116 @@ on:
         description: "镜像标签（如 latest 或 v1.0.0）"
         required: true
         default: "latest"
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  build-push:
+  detect-changes:
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master')
+      )
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      count: ${{ steps.set-matrix.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: 生成需要构建的服务矩阵
+        id: set-matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          services=(hm-gateway item-service cart-service user-service trade-service pay-service promotion-service ai-assistant-service)
+
+          default_branch="${{ github.event.repository.default_branch }}"
+          git fetch --no-tags --prune origin "+refs/heads/${default_branch}:refs/remotes/origin/${default_branch}"
+
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            head="${{ github.event.workflow_run.head_sha }}"
+            base="$(git rev-parse "${head}^" 2>/dev/null || echo "origin/${default_branch}")"
+          else
+            head="${GITHUB_SHA}"
+            base="origin/${default_branch}"
+          fi
+
+          changed_files="$(git diff --name-only "${base}" "${head}" || true)"
+          echo "Changed files:"
+          echo "${changed_files}"
+
+          rebuild_all="false"
+          selected=()
+
+          while IFS= read -r f; do
+            [[ -z "${f}" ]] && continue
+
+            case "${f}" in
+              pom.xml|docker/*|hm-common/*|hm-api/*)
+                rebuild_all="true"
+                ;;
+            esac
+
+            case "${f}" in
+              hm-gateway/*|docker/services/hm-gateway/*) selected+=("hm-gateway") ;;
+              item-service/*|docker/services/item-service/*) selected+=("item-service") ;;
+              cart-service/*|docker/services/cart-service/*) selected+=("cart-service") ;;
+              user-service/*|docker/services/user-service/*) selected+=("user-service") ;;
+              trade-service/*|docker/services/trade-service/*) selected+=("trade-service") ;;
+              pay-service/*|docker/services/pay-service/*) selected+=("pay-service") ;;
+              promotion-service/*|docker/services/promotion-service/*) selected+=("promotion-service") ;;
+              ai-assistant-service/*|docker/services/ai-assistant-service/*) selected+=("ai-assistant-service") ;;
+            esac
+          done <<< "${changed_files}"
+
+          if [[ "${rebuild_all}" == "true" ]]; then
+            selected=("${services[@]}")
+          fi
+
+          # 去重
+          uniq_selected=()
+          for s in "${selected[@]:-}"; do
+            skip="false"
+            for u in "${uniq_selected[@]:-}"; do
+              [[ "${u}" == "${s}" ]] && skip="true" && break
+            done
+            [[ "${skip}" == "false" ]] && uniq_selected+=("${s}")
+          done
+
+          python - "${uniq_selected[@]:-}" <<'PY' >> "$GITHUB_OUTPUT"
+import json, sys
+services = sys.argv[1:]
+include = [{"service": s, "dockerfile": f"docker/services/{s}/Dockerfile"} for s in services]
+print("matrix=" + json.dumps({"include": include}, ensure_ascii=False))
+print("count=" + str(len(include)))
+PY
+
+  build-push:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.count != '0'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - service: hm-gateway
-            dockerfile: docker/services/hm-gateway/Dockerfile
-          - service: item-service
-            dockerfile: docker/services/item-service/Dockerfile
-          - service: cart-service
-            dockerfile: docker/services/cart-service/Dockerfile
-          - service: user-service
-            dockerfile: docker/services/user-service/Dockerfile
-          - service: trade-service
-            dockerfile: docker/services/trade-service/Dockerfile
-          - service: pay-service
-            dockerfile: docker/services/pay-service/Dockerfile
-          - service: promotion-service
-            dockerfile: docker/services/promotion-service/Dockerfile
-          - service: ai-assistant-service
-            dockerfile: docker/services/ai-assistant-service/Dockerfile
+        include: ${{ fromJSON(needs.detect-changes.outputs.matrix).include }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: 登录 GHCR
         uses: docker/login-action@v3
@@ -55,6 +134,16 @@ jobs:
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "image=ghcr.io/${owner}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
 
+      - name: 计算镜像标签
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 构建并推送
         uses: docker/build-push-action@v6
         with:
@@ -62,5 +151,5 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ github.event.inputs.tag }}
+            ${{ steps.meta.outputs.image }}:${{ steps.tag.outputs.value }}
             ${{ steps.meta.outputs.image }}:${{ github.sha }}
