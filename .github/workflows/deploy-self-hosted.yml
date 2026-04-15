@@ -28,9 +28,23 @@ jobs:
 
     steps:
       # 1. 彻底删掉 actions/checkout@v4，因为它需要连接 github.com 443 端口
+      - name: 计算镜像标签
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+
       
       - name: 执行本地部署
         run: |
+          set -e
+          export GHCR_OWNER="${{ secrets.GHCR_OWNER_LOWER }}"
+          export HMALL_IMAGE_TAG="${{ steps.tag.outputs.value }}"
           # 因为你配置了 -v /root/hmall:/root/hmall
           # 所以在容器内部，这个路径是真实存在的
           cd /root/hmall
