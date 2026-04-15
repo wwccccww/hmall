@@ -100,12 +100,12 @@ jobs:
           done
 
           python - "${uniq_selected[@]:-}" <<'PY' >> "$GITHUB_OUTPUT"
-import json, sys
-services = sys.argv[1:]
-include = [{"service": s, "dockerfile": f"docker/services/{s}/Dockerfile"} for s in services]
-print("matrix=" + json.dumps({"include": include}, ensure_ascii=False))
-print("count=" + str(len(include)))
-PY
+          import json, sys
+          services = sys.argv[1:]
+          include = [{"service": s, "dockerfile": f"docker/services/{s}/Dockerfile"} for s in services]
+          print("matrix=" + json.dumps({"include": include}, ensure_ascii=False))
+          print("count=" + str(len(include)))
+          PY
 
   build-push:
     needs: detect-changes
