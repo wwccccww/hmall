@@ -54,8 +54,8 @@ jobs:
           echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_PULL_USER }}" --password-stdin
           
           # 3. 拉取并更新
-          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
-          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml pull
+          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml up -d --no-build
 
       
     # steps:
