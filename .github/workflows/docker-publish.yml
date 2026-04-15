@@ -47,7 +47,11 @@ jobs:
         id: owner
         shell: bash
         run: |
-          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          if [[ -n "${{ secrets.GHCR_OWNER_LOWER }}" ]]; then
+            owner="${{ secrets.GHCR_OWNER_LOWER }}"
+          else
+            owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          fi
           echo "value=${owner}" >> "$GITHUB_OUTPUT"
 
   detect-changes:
