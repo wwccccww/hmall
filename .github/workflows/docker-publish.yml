@@ -144,11 +144,11 @@ jobs:
   build-push:
     needs: [compute-tag, detect-changes]
     runs-on: ubuntu-latest
-    if: needs.detect-changes.outputs.count != '0'
+    if: needs['detect-changes'].outputs.count != '0'
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.detect-changes.outputs.matrix).include }}
+        include: ${{ fromJSON(needs['detect-changes'].outputs.matrix).include }}
 
     steps:
       - uses: actions/checkout@v4
@@ -165,7 +165,7 @@ jobs:
       - name: 镜像名（owner 小写）
         id: meta
         run: |
-          echo "image=ghcr.io/${{ needs.compute-tag.outputs.owner }}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${{ needs['compute-tag'].outputs.owner }}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
 
       - name: 构建并推送
         uses: docker/build-push-action@v6
@@ -174,11 +174,11 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ needs.compute-tag.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:${{ needs['compute-tag'].outputs.tag }}
             ${{ steps.meta.outputs.image }}:latest
 
   retag-unchanged:
-    needs: [compute-tag, detect-changes, build-push]
+    needs: [compute-tag, detect-changes]
     runs-on: ubuntu-latest
     # 自动链路和手动发版都补齐 tag
     if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
@@ -197,8 +197,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          owner="${{ needs.compute-tag.outputs.owner }}"
-          tag="${{ needs.compute-tag.outputs.tag }}"
+          owner="${{ needs['compute-tag'].outputs.owner }}"
+          tag="${{ needs['compute-tag'].outputs.tag }}"
           services=(hm-gateway item-service cart-service user-service trade-service pay-service promotion-service ai-assistant-service)
 
           # 本次实际构建的服务（JSON include -> service 列表）
@@ -227,4 +227,4 @@ jobs:
             docker buildx imagetools create -t "${dst}" "${src}"
           done
         env:
-          MATRIX: ${{ needs.detect-changes.outputs.matrix }}
+          MATRIX: ${{ needs['detect-changes'].outputs.matrix }}
