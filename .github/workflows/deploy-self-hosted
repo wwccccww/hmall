@@ -1,0 +1,32 @@
+jobs:
+  deploy:
+    runs-on: self-hosted  # 重点：直接在你的虚拟机里跑
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 计算镜像标签
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 本地执行部署
+        run: |
+          # 切换到你的项目目录
+          cd /root/hmall  
+          
+          # 设置环境变量
+          export GHCR_OWNER="${{ secrets.GHCR_OWNER_LOWER }}"
+          export HMALL_IMAGE_TAG="${{ steps.tag.outputs.value }}"
+          
+          # 登录并更新
+          echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_PULL_USER }}" --password-stdin
+          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
