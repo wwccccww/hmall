@@ -1,15 +1,35 @@
+name: Deploy-self-hosted (Local Runner)
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "镜像标签，需与 Publish 时一致"
+        required: true
+        default: "latest"
+
+  workflow_run:
+    workflows: ["Publish Docker images"]
+    types:
+      - completed
+
 jobs:
   deploy:
-    runs-on: self-hosted  # 重点：直接在你的虚拟机里跑
+    # 核心修改：指定在你刚才配置的 Docker Runner 上运行
+    runs-on: self-hosted
+    
+    # 只有手动触发，或者 Publish 成功后才运行
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
+      
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
       - name: 计算镜像标签
         id: tag
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
@@ -17,16 +37,26 @@ jobs:
             echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 本地执行部署
+      - name: 执行本地部署
+        shell: bash
         run: |
-          # 切换到你的项目目录
-          cd /root/hmall  
+          set -e
           
-          # 设置环境变量
+          # 1. 进入项目目录（请确保你的虚拟机此路径下已有 docker-compose 文件）
+          # 如果路径不同，请修改此处
+          cd /root/hmall 
+          
+          # 2. 设置环境变量（供 docker-compose.ghcr.yml 使用）
           export GHCR_OWNER="${{ secrets.GHCR_OWNER_LOWER }}"
           export HMALL_IMAGE_TAG="${{ steps.tag.outputs.value }}"
           
-          # 登录并更新
+          # 3. 登录 GHCR
           echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_PULL_USER }}" --password-stdin
+          
+          # 4. 拉取镜像并启动
+          # 注意：这里同时使用了基础配置和 GHCR 专用配置
           docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
           docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
+          
+          # 5. 清理过期的虚悬镜像（释放虚拟机磁盘）
+          docker image prune -f
