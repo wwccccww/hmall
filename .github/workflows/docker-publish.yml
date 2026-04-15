@@ -207,6 +207,7 @@ jobs:
         shell: bash
         env:
           OWNER_OVERRIDE: ${{ secrets.GHCR_OWNER_LOWER }}
+          MATRIX: ${{ needs['detect-changes'].outputs.matrix }}
         run: |
           set -euo pipefail
           owner="${{ needs['compute-tag'].outputs.owner }}"
@@ -246,5 +247,3 @@ jobs:
             echo "Retag ${src} -> ${dst}"
             docker buildx imagetools create -t "${dst}" "${src}"
           done
-        env:
-          MATRIX: ${{ needs['detect-changes'].outputs.matrix }}
