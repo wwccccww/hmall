@@ -178,7 +178,7 @@ jobs:
             ${{ steps.meta.outputs.image }}:latest
 
   retag-unchanged:
-    needs: [compute-tag, detect-changes, build-push]
+    needs: [compute-tag, detect-changes]
     runs-on: ubuntu-latest
     # 自动链路和手动发版都补齐 tag
     if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
