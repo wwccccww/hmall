@@ -71,5 +71,11 @@ public class UserController {
         vo.setUserId(user.getId());
         return vo;
     }
+
+
+    @GetMapping("/hello")
+    public String hello(){
+        return "hello";
+    }
 }
 
