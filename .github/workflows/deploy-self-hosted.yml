@@ -63,7 +63,7 @@ jobs:
 
           docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml pull 
           docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml up -d --no-build
-
+          docker image prune -f
       
     # steps:
     #   - name: 检出代码
