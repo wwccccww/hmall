@@ -34,6 +34,22 @@ scrape_configs:
           log_type: slow
           __path__: /var/log/mysql/slow.log
 
+    # slow log 为多行：先合并为单条事件，再提取耗时与 SQL，Grafana 里更好查/告警
+    pipeline_stages:
+      - multiline:
+          firstline: '^# Time:'
+          max_wait_time: 3s
+      - regex:
+          # 兼容 MySQL slow log 常见格式（Query_time 行 + SET timestamp 行 + SQL）
+          expression: '(?s)^# Time:.*?\n# User@Host:.*?\n# Query_time: (?P<query_time>[0-9.]+)\s+Lock_time: (?P<lock_time>[0-9.]+)\s+Rows_sent: (?P<rows_sent>\d+)\s+Rows_examined: (?P<rows_examined>\d+).*?\nSET timestamp=\d+;\n(?P<sql>.*?)(?:\n# Time:|\Z)'
+      - labels:
+          query_time:
+      - template:
+          source: message
+          template: '{{ .query_time }}s | {{ .sql }}'
+      - output:
+          source: message
+
   # 方案A：采集「Windows 本机运行的微服务」写到文件的日志（需先将 Windows 目录通过 SMB 挂载到虚拟机 /mnt/hmall，并在 compose 中映射为 /host-hmall）
   # - job_name: windows-host-logs
   #   static_configs:
