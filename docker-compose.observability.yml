@@ -39,6 +39,8 @@ services:
     volumes:
       - ./docker/observability/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # 方案A：采集 MySQL 慢查询日志（来自主 compose 挂载到宿主机目录）
+      - ./docker/mysql/logs:/var/log/mysql:ro
       # 方案A：虚拟机挂载 Windows SMB 共享后的目录（示例 /mnt/hmall），供 promtail 采集本机（Windows）运行的微服务日志文件
       # 你当前已通过 VMware 共享目录挂载到：/mnt/hgfs
       - /mnt/hgfs:/host-hmall:ro

@@ -23,6 +23,17 @@ scrape_configs:
         regex: '/(.*)'
         target_label: container
 
+  # 方案A：采集 MySQL 慢查询日志（slow log）到 Loki
+  - job_name: mysql-slowlog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: mysql-slowlog
+          service: mysql
+          log_type: slow
+          __path__: /var/log/mysql/slow.log
+
   # 方案A：采集「Windows 本机运行的微服务」写到文件的日志（需先将 Windows 目录通过 SMB 挂载到虚拟机 /mnt/hmall，并在 compose 中映射为 /host-hmall）
   # - job_name: windows-host-logs
   #   static_configs:

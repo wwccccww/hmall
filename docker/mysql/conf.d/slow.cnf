@@ -1,0 +1,9 @@
+[mysqld]
+# 方案A：慢查询日志（写文件，供 Promtail → Loki → Grafana）
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 0.5
+log_queries_not_using_indexes = 0
+
+# 建议输出更可读（可选）
+log_output = FILE
