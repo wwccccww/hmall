@@ -299,11 +299,11 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon> impleme
         // 1. 本地缓存快速校验：避免失败请求反复打库
         CouponMeta meta = getCouponMeta(couponId);
         if (meta == null) {
-            throw new BizIllegalException("优惠券不存在或活动未开始");
+            throw new BizIllegalException("优惠券不存在或活动未开始",404);
         }
         LocalDateTime now = LocalDateTime.now();
         if (!meta.isActive(now)) {
-            throw new BizIllegalException("优惠券不存在或活动未开始");
+            throw new BizIllegalException("优惠券不存在或活动未开始",404);
         }
 
         // 1.1 服务侧令牌桶：按 userId + couponId 限流（在秒杀 Lua 之前快速拒绝刷接口）
