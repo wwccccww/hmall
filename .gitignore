@@ -31,3 +31,10 @@ scripts/k6/tokens.json
 
 .env
 简历.md
+
+*.zip
+*.dic
+*.json
+target/
+.idea/
+k6-reports/
