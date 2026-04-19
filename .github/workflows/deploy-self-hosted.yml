@@ -61,8 +61,8 @@ jobs:
           # docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml build ai-assistant-service
 
 
-          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml pull 
-          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml up -d --no-build
+          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull 
+          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build
           docker image prune -f
       
     # steps:
@@ -102,3 +102,12 @@ jobs:
           
     #       # 5. 清理过期的虚悬镜像（释放虚拟机磁盘）
     #       docker image prune -f
+
+
+
+
+
+
+    # 唔理
+    # docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml pull 
+    #       docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml up -d --no-build
