@@ -39,7 +39,7 @@ templates:
       - **Top3 按次数（指纹/表）**: `{{ .Annotations.logql_topk }}`
       {{- end }}
       {{- if .Annotations.logql_topk_qt }}
-      - **Top3 按最大 qt（需 qt 为数值；否则改用 logql_topk）**: `{{ .Annotations.logql_topk_qt }}`
+      - **补充查询**: `{{ .Annotations.logql_topk_qt }}`
       {{- end }}
 
       {{ end }}

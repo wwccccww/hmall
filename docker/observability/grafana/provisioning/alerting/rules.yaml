@@ -1,4 +1,4 @@
-# 慢 SQL（Loki：job=mysql-slowlog，Promtail 输出单行 JSON）
+# 慢 SQL（Loki：job=mysql-slowlog，Promtail 仅合并多行块入库，按行 count，勿使用 | json）
 # Critical：近 5m 条数 >100，或「近 5m − 前 5m」突增 >50 且近 5m ≥20（秒杀型尖峰）
 # Warning：近 5m 条数 >20，且不满足 Critical 条件
 # 钉钉：由 contact_points.yaml + templates.yaml；每条规则通过 notification_settings 直达联系点（不覆盖全局通知策略树）。
@@ -23,7 +23,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m]))
+              expr: sum(count_over_time({job="mysql-slowlog"} [5m]))
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -39,7 +39,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m] offset 5m))
+              expr: sum(count_over_time({job="mysql-slowlog"} [5m] offset 5m))
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -108,14 +108,14 @@ groups:
           summary: '[Critical] 慢SQL：5m条数>100，或(环比Δ>50且5m≥20)'
           description: |
             触发含义（Loki 瞬时查询）：
-            - A = 最近 5 分钟慢日志行数：`sum(count_over_time({job="mysql-slowlog"} | json [5m]))`
-            - B = 其前 5 分钟行数：同上 + `[5m] offset 5m`
+            - A = 最近 5 分钟慢日志条数：`sum(count_over_time({job="mysql-slowlog"} [5m]))`
+            - B = 其前 5 分钟条数：同上 + `[5m] offset 5m`
             - C = A − B（环比突增量，秒杀型尖峰主要看 C）
             条件：A>100，或 (C>50 且 A≥20)。持续 30s 后通知。
             处置：Grafana → Explore → Loki，用下方 logql_* 查指纹/表/脱敏片段；必要时看 MySQL slow.log 与业务流量。
-          logql_lines: '{job="mysql-slowlog"} | json'
-          logql_topk: 'topk(3, sum by (fp, tbl) (count_over_time({job="mysql-slowlog"} | json [5m])))'
-          logql_topk_qt: 'topk(3, max by (fp, tbl) (max_over_time({job="mysql-slowlog"} | json | unwrap qt [5m])))'
+          logql_lines: '{job="mysql-slowlog"}'
+          logql_topk: 'sum(count_over_time({job="mysql-slowlog"} [5m]))'
+          logql_topk_qt: '已改为原始慢日志块，无 JSON qt；可在 Explore 全文检索 # Query_time:'
         labels:
           severity: critical
           hmall_alert: slowsql
@@ -137,7 +137,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m]))
+              expr: sum(count_over_time({job="mysql-slowlog"} [5m]))
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -153,7 +153,7 @@ groups:
                 type: loki
                 uid: loki
               editorMode: code
-              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m] offset 5m))
+              expr: sum(count_over_time({job="mysql-slowlog"} [5m] offset 5m))
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -223,9 +223,9 @@ groups:
           description: |
             触发含义：A=近5m条数，B=前5m条数，C=A−B。条件：A>20 且 A≤100 且 C≤50（避免与 Critical 重复轰炸）。
             持续 1m 后通知。请在 Explore 用 logql_* 确认是否为偶发或可优化 SQL。
-          logql_lines: '{job="mysql-slowlog"} | json'
-          logql_topk: 'topk(3, sum by (fp, tbl) (count_over_time({job="mysql-slowlog"} | json [5m])))'
-          logql_topk_qt: 'topk(3, max by (fp, tbl) (max_over_time({job="mysql-slowlog"} | json | unwrap qt [5m])))'
+          logql_lines: '{job="mysql-slowlog"}'
+          logql_topk: 'sum(count_over_time({job="mysql-slowlog"} [5m]))'
+          logql_topk_qt: '已改为原始慢日志块，无 JSON qt；可在 Explore 全文检索 # Query_time:'
         labels:
           severity: warning
           hmall_alert: slowsql
