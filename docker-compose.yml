@@ -201,6 +201,7 @@ services:
       - hmall-net
 
   hm-gateway:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-hm-gateway:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/hm-gateway/Dockerfile
@@ -238,6 +239,7 @@ services:
       - hmall-net
 
   item-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-item-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/item-service/Dockerfile
@@ -281,6 +283,7 @@ services:
       - hmall-net
 
   cart-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-cart-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/cart-service/Dockerfile
@@ -318,6 +321,7 @@ services:
       - hmall-net
 
   user-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-user-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/user-service/Dockerfile
@@ -355,6 +359,7 @@ services:
       - hmall-net
 
   trade-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-trade-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/trade-service/Dockerfile
@@ -401,6 +406,7 @@ services:
       - hmall-net
 
   pay-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-pay-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/pay-service/Dockerfile
@@ -445,6 +451,7 @@ services:
       - hmall-net
 
   promotion-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-promotion-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/promotion-service/Dockerfile
@@ -489,6 +496,7 @@ services:
       - hmall-net
 
   promotion-service-2:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-promotion-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/promotion-service/Dockerfile
@@ -533,6 +541,7 @@ services:
       - hmall-net
 
   ai-assistant-service:
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-ai-assistant-service:${TAG:-latest}
     build:
       context: .
       dockerfile: docker/services/ai-assistant-service/Dockerfile

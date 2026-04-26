@@ -1,6 +1,6 @@
-# 持续交付（示例）：在 GitHub 上手动触发，将各微服务镜像推送到 GHCR
-# 使用前请在仓库 Settings → Actions → General → Workflow permissions 勾选 “Read and write permissions”
-# 首次拉取：docker pull ghcr.io/<你的用户名小写>/hmall-hm-gateway:latest
+# 持续交付：在 GitHub 上手动触发/或 CI 成功后触发，将各微服务镜像推送到阿里云 ACR
+# 需要在仓库 Secrets 配置：ACR_REGISTRY、ACR_NAMESPACE、ACR_USERNAME、ACR_PASSWORD
+# 拉取示例：docker pull ${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-hm-gateway:latest
 name: Publish Docker images
 
 on:
@@ -17,7 +17,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   compute-tag:
@@ -31,7 +30,6 @@ jobs:
       )
     outputs:
       tag: ${{ steps.tag.outputs.value }}
-      owner: ${{ steps.owner.outputs.value }}
     steps:
       - name: 计算镜像标签
         id: tag
@@ -42,17 +40,6 @@ jobs:
           else
             echo "value=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: 计算 owner（小写）
-        id: owner
-        shell: bash
-        run: |
-          if [[ -n "${{ secrets.GHCR_OWNER_LOWER }}" ]]; then
-            owner="${{ secrets.GHCR_OWNER_LOWER }}"
-          else
-            owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          fi
-          echo "value=${owner}" >> "$GITHUB_OUTPUT"
 
   detect-changes:
     needs: compute-tag
@@ -155,27 +142,22 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
-      - name: 登录 GHCR
+      - name: 登录阿里云 ACR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: 镜像名（owner 小写）
+      - name: 镜像名（ACR）
         id: meta
         shell: bash
-        env:
-          OWNER_OVERRIDE: ${{ secrets.GHCR_OWNER_LOWER }}
         run: |
-          owner="${{ needs['compute-tag'].outputs.owner }}"
-          if [[ -z "${owner}" && -n "${OWNER_OVERRIDE}" ]]; then
-            owner="${OWNER_OVERRIDE}"
+          if [[ -z "${{ secrets.ACR_REGISTRY }}" || -z "${{ secrets.ACR_NAMESPACE }}" ]]; then
+            echo "Missing secrets: ACR_REGISTRY / ACR_NAMESPACE" >&2
+            exit 1
           fi
-          if [[ -z "${owner}" ]]; then
-            owner="$(echo "${GITHUB_REPOSITORY}" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')"
-          fi
-          echo "image=ghcr.io/${owner}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/hmall-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
 
       - name: 构建并推送
         uses: docker/build-push-action@v6
@@ -193,12 +175,12 @@ jobs:
     # 自动链路和手动发版都补齐 tag
     if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
     steps:
-      - name: 登录 GHCR
+      - name: 登录阿里云 ACR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Setup buildx
         uses: docker/setup-buildx-action@v3
@@ -206,21 +188,17 @@ jobs:
       - name: 为未构建服务补齐 SHA tag（从 latest 复用 manifest）
         shell: bash
         env:
-          OWNER_OVERRIDE: ${{ secrets.GHCR_OWNER_LOWER }}
           MATRIX: ${{ needs['detect-changes'].outputs.matrix }}
         run: |
           set -euo pipefail
-          owner="${{ needs['compute-tag'].outputs.owner }}"
-          if [[ -z "${owner}" && -n "${OWNER_OVERRIDE}" ]]; then
-            owner="${OWNER_OVERRIDE}"
-          fi
-          if [[ -z "${owner}" ]]; then
-            owner="$(echo "${GITHUB_REPOSITORY}" | cut -d/ -f1 | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "${{ secrets.ACR_REGISTRY }}" || -z "${{ secrets.ACR_NAMESPACE }}" ]]; then
+            echo "Missing secrets: ACR_REGISTRY / ACR_NAMESPACE" >&2
+            exit 1
           fi
           tag="${{ needs['compute-tag'].outputs.tag }}"
           services=(hm-gateway item-service cart-service user-service trade-service pay-service promotion-service ai-assistant-service)
 
-          echo "Using GHCR owner: ${owner} (len=${#owner}), tag: ${tag}"
+          echo "Using ACR: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}, tag: ${tag}"
 
           # 本次实际构建的服务（JSON include -> service 列表）
           built="$(python - <<'PY'
@@ -242,8 +220,8 @@ jobs:
             if is_built "$s"; then
               continue
             fi
-            src="ghcr.io/${owner}/hmall-${s}:latest"
-            dst="ghcr.io/${owner}/hmall-${s}:${tag}"
+            src="${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/hmall-${s}:latest"
+            dst="${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/hmall-${s}:${tag}"
             echo "Retag ${src} -> ${dst}"
             docker buildx imagetools create -t "${dst}" "${src}"
           done

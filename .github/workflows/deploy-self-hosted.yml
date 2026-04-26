@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "镜像标签，需与 Publish 时一致"
+        description: "镜像标签（默认 latest；也可填某次 Publish 的 SHA tag）"
         required: true
         default: "latest"
 
@@ -27,7 +27,6 @@ jobs:
 
 
     steps:
-      # 1. 彻底删掉 actions/checkout@v4，因为它需要连接 github.com 443 端口
       - name: 计算镜像标签
         id: tag
         shell: bash
@@ -43,28 +42,20 @@ jobs:
       - name: 执行本地部署
         run: |
           set -e
-          export GHCR_OWNER="${{ secrets.GHCR_OWNER_LOWER }}"
-          export HMALL_IMAGE_TAG="${{ steps.tag.outputs.value }}"
-          # 因为你配置了 -v /root/hmall:/root/hmall
-          # 所以在容器内部，这个路径是真实存在的
+          # 进入项目目录（该目录需要存在 docker-compose.yml）
           cd /root/hmall
-          
-          # 2. 登录 GHCR (镜像仓库)
-          # 注意：拉取镜像走的是 Docker 协议，通常比 Git 克隆要稳
-          echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_PULL_USER }}" --password-stdin
-          
-          # 3. 拉取并更新
-          # 说明：某些网络环境下拉取 GHCR 的 ai-assistant-service 可能在 token/manifest 阶段 EOF。
-          # 策略：先 pull 其它镜像；ai-assistant-service 走本地 build（仍打同名 ghcr 镜像标签），避免部署失败。
-          # docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml pull \
-          #   hm-gateway item-service cart-service user-service trade-service pay-service promotion-service promotion-service-2
-          # docker compose -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.observability.yml build ai-assistant-service
 
+          # 登录阿里云 ACR 并拉取部署
+          docker login "${{ secrets.ACR_REGISTRY }}" -u "${{ secrets.ACR_USERNAME }}" -p "${{ secrets.ACR_PASSWORD }}"
 
-          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull 
-          docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d --no-build || {
+          export ACR_REGISTRY="${{ secrets.ACR_REGISTRY }}"
+          export ACR_NAMESPACE="${{ secrets.ACR_NAMESPACE }}"
+          export TAG="${{ steps.tag.outputs.value }}"
+
+          docker compose pull
+          docker compose up -d --no-build || {
             echo "=== docker compose ps -a ==="
-            docker compose -f docker-compose.yml -f docker-compose.ghcr.yml ps -a || true
+            docker compose ps -a || true
             echo "=== hmall-nacos logs (tail 200) ==="
             docker logs hmall-nacos --tail 200 2>&1 || true
             exit 1
