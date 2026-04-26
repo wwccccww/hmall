@@ -20,6 +20,10 @@ jobs:
   deploy:
     # 核心修改：指定在你刚才配置的 Docker Runner 上运行
     runs-on: self-hosted
+    env:
+      # 注意：self-hosted 的 bash 步骤里不一定会自动注入 GITHUB_TOKEN 环境变量；
+      # 显式把 github.token 映射进来，供 git HTTPS 拉取使用。
+      GITHUB_TOKEN: ${{ github.token }}
     
     # 只有手动触发，或者 Publish 成功后才运行
     if: >
