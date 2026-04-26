@@ -41,15 +41,15 @@ scrape_configs:
           firstline: '^# Time:'
           max_wait_time: 3s
       - regex:
-          # 兼容 MySQL slow log：Query_time 块后允许 # 注释行；SET timestamp 行可选（无此行时很多环境整条不匹配 → Loki 完全无数据）
-          # 注意：Promtail 使用 RE2；multiline 已保证每条事件独立
-          expression: '(?s)^# Time:.*?(?:\r?\n)# User@Host:.*?(?:\r?\n)# Query_time: (?P<query_time>[0-9.]+)\s+Lock_time: (?P<lock_time>[0-9.]+)\s+Rows_sent: (?P<rows_sent>\d+)\s+Rows_examined: (?P<rows_examined>\d+)\s*(?:\r?\n)(?:#[^\r\n]*(?:\r?\n))*(?:SET timestamp=\d+;\s*(?:\r?\n))?(?P<sql>.*)$'
+          # User@Host 与 # Query_time 之间常有 # Thread_id / # Schema 等行，必须用 #(?! Query_time:) 跳过，否则会整段匹配失败 → Loki 无数据
+          # Rows 与 SET/SQL 之间允许 # 注释行，但不得吞掉 SET timestamp；SQL 前 SET 行仍可选
+          expression: '(?s)^# Time:.*?(?:\r?\n)# User@Host:.*?(?:\r?\n)(?:#(?! Query_time:)[^\r\n]*(?:\r?\n))*# Query_time: (?P<query_time>[0-9.]+)\s+Lock_time: (?P<lock_time>[0-9.]+)\s+Rows_sent: (?P<rows_sent>\d+)\s+Rows_examined: (?P<rows_examined>\d+)\s*(?:\r?\n)(?:#(?!SET timestamp)[^\r\n]*(?:\r?\n))*(?:SET timestamp=\d+;\s*(?:\r?\n))?(?P<sql>.*)$'
       - regex:
           expression: '(?i)(?:from|join|into|update)\s+`?(?P<tbl>[a-zA-Z0-9_.]+)`?'
           source: sql
       - template:
           source: sql_norm
-          template: '{{ regexReplaceAll `''[^'']*''` (regexReplaceAll `\b\d+\b` .sql "?") (print "'" "?" "'") }}'
+          template: '{{ if .sql }}{{ regexReplaceAll `''[^'']*''` (regexReplaceAll `\b\d+\b` .sql "?") (print "'" "?" "'") }}{{ end }}'
       - template:
           source: fp
           template: '{{ sha256sum .sql_norm | trunc 12 }}'
@@ -58,7 +58,7 @@ scrape_configs:
           template: '{{ .sql_norm | trunc 180 }}'
       - template:
           source: logline
-          template: '{"fp":"{{ .fp }}","tbl":{{ (.tbl | default "") | toJson }},"qt":{{ .query_time }},"q":{{ .q | toJson }}}'
+          template: '{"fp":"{{ .fp }}","tbl":{{ (.tbl | default "") | toJson }},"qt":{{ .query_time | default "0" }},"q":{{ (.q | default "") | toJson }}}'
       - output:
           source: logline
 
