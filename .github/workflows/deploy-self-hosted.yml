@@ -20,6 +20,10 @@ jobs:
   deploy:
     # 核心修改：指定在你刚才配置的 Docker Runner 上运行
     runs-on: self-hosted
+    env:
+      # 注意：self-hosted 的 bash 步骤里不一定会自动注入 GITHUB_TOKEN 环境变量；
+      # 显式把 github.token 映射进来，供 git HTTPS 拉取使用。
+      GITHUB_TOKEN: ${{ github.token }}
     
     # 只有手动触发，或者 Publish 成功后才运行
     if: >
@@ -56,17 +60,23 @@ jobs:
 
           # 同步 compose 文件：否则虚拟机可能还停留在旧的 GHCR 配置，表现为 pull Skipped + ps 里仍是 ghcr.io/...
           if [[ -d .git ]]; then
-            git remote -v || true
-
             # 说明：很多机器 clone 用的是 git@github.com:...，但 runner 未配置 known_hosts 时会报：
             # Host key verification failed
-            # 这里强制走 HTTPS，并用 GITHUB_TOKEN（Actions 自动注入）拉取代码。
-            if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-              echo "ERROR: 缺少 GITHUB_TOKEN（请确认 workflow permissions 未禁用 token）" >&2
-              exit 1
+            # 这里强制走 HTTPS 拉取代码。
+            #
+            # 注意：部分 Git/CURL 组合下 `http.extraheader=AUTHORIZATION: bearer ...` 可能不生效，
+            # 会退回到交互式用户名密码提示，从而在 Actions 日志里出现：
+            # fatal: could not read Username for 'https://github.com': No such device or address
+            # 因此这里优先使用 x-access-token 嵌入 URL（对 GitHub Actions token 最稳）。
+            https_origin_public="https://github.com/${{ github.repository }}.git"
+            if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+              https_origin_authed="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+            else
+              https_origin_authed="${https_origin_public}"
             fi
 
-            git remote set-url origin "https://github.com/${{ github.repository }}.git"
+            git remote set-url origin "${https_origin_public}"
+            echo "origin (sanitized): $(git remote get-url origin | sed -E 's#https://[^@]+@#https://***@#')"
 
             default_branch=""
             if git symbolic-ref -q refs/remotes/origin/HEAD >/dev/null 2>&1; then
@@ -83,14 +93,27 @@ jobs:
               fi
             fi
 
-            git -c http.version=HTTP/1.1 \
-              -c "http.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
-              fetch --prune origin
+            fetch_pull() {
+              local url="$1"
+              GIT_TERMINAL_PROMPT=0 \
+                git -c http.version=HTTP/1.1 \
+                fetch --prune "${url}" \
+                "+refs/heads/${default_branch}:refs/remotes/origin/${default_branch}"
 
-            git checkout "${default_branch}"
-            git -c http.version=HTTP/1.1 \
-              -c "http.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
-              pull --ff-only origin "${default_branch}"
+              git checkout "${default_branch}"
+              GIT_TERMINAL_PROMPT=0 \
+                git merge --ff-only "origin/${default_branch}"
+            }
+
+            set +e
+            fetch_pull "${https_origin_authed}"
+            rc=$?
+            set -e
+
+            if [[ "${rc}" != "0" ]]; then
+              echo "WARN: 使用 GITHUB_TOKEN 拉取失败（rc=${rc}）。如果是公开仓库，将尝试匿名 HTTPS。" >&2
+              fetch_pull "${https_origin_public}"
+            fi
           else
             echo "WARN: /root/hmall 不是 git 仓库，无法自动 git pull；请手动同步最新 docker-compose.yml" >&2
           fi
