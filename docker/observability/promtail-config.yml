@@ -41,9 +41,9 @@ scrape_configs:
           firstline: '^# Time:'
           max_wait_time: 3s
       - regex:
-          # 兼容 MySQL slow log 常见格式（Query_time 行 + SET timestamp 行 + SQL）
-          # 注意：Promtail 使用 RE2，不支持 \Z 等 PCRE 语法；multiline 已保证每条事件独立，因此直接匹配到结尾即可
-          expression: '(?s)^# Time:.*?\n# User@Host:.*?\n# Query_time: (?P<query_time>[0-9.]+)\s+Lock_time: (?P<lock_time>[0-9.]+)\s+Rows_sent: (?P<rows_sent>\d+)\s+Rows_examined: (?P<rows_examined>\d+).*?\nSET timestamp=\d+;\n(?P<sql>.*)$'
+          # 兼容 MySQL slow log：Query_time 块后允许 # 注释行；SET timestamp 行可选（无此行时很多环境整条不匹配 → Loki 完全无数据）
+          # 注意：Promtail 使用 RE2；multiline 已保证每条事件独立
+          expression: '(?s)^# Time:.*?(?:\r?\n)# User@Host:.*?(?:\r?\n)# Query_time: (?P<query_time>[0-9.]+)\s+Lock_time: (?P<lock_time>[0-9.]+)\s+Rows_sent: (?P<rows_sent>\d+)\s+Rows_examined: (?P<rows_examined>\d+)\s*(?:\r?\n)(?:#[^\r\n]*(?:\r?\n))*(?:SET timestamp=\d+;\s*(?:\r?\n))?(?P<sql>.*)$'
       - regex:
           expression: '(?i)(?:from|join|into|update)\s+`?(?P<tbl>[a-zA-Z0-9_.]+)`?'
           source: sql
