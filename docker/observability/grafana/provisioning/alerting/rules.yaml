@@ -1,0 +1,234 @@
+# 慢 SQL（Loki：job=mysql-slowlog，Promtail 输出单行 JSON）
+# Critical：近 5m 条数 >100，或「近 5m − 前 5m」突增 >50 且近 5m ≥20（秒杀型尖峰）
+# Warning：近 5m 条数 >20，且不满足 Critical 条件
+# 钉钉：由 contact_points.yaml + templates.yaml；每条规则通过 notification_settings 直达联系点（不覆盖全局通知策略树）。
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: slowsql_mysql_loki
+    folder: HMall
+    interval: 1m
+    rules:
+      - uid: hmall_slowsql_crit
+        title: Slow SQL Critical（条数或环比突增）
+        condition: E
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: instant
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m] offset 5m))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: instant
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: $A - $B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
+          - refId: D
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: ($A > 100) || (($C > 50) && ($A >= 20))
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: D
+              type: math
+          - refId: E
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - D
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: D
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: E
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 30s
+        annotations:
+          summary: '[Critical] 慢SQL：5m条数>100，或(环比Δ>50且5m≥20)'
+          description: |
+            触发含义（Loki 瞬时查询）：
+            - A = 最近 5 分钟慢日志行数：`sum(count_over_time({job="mysql-slowlog"} | json [5m]))`
+            - B = 其前 5 分钟行数：同上 + `[5m] offset 5m`
+            - C = A − B（环比突增量，秒杀型尖峰主要看 C）
+            条件：A>100，或 (C>50 且 A≥20)。持续 30s 后通知。
+            处置：Grafana → Explore → Loki，用下方 logql_* 查指纹/表/脱敏片段；必要时看 MySQL slow.log 与业务流量。
+          logql_lines: '{job="mysql-slowlog"} | json'
+          logql_topk: 'topk(3, sum by (fp, tbl) (count_over_time({job="mysql-slowlog"} | json [5m])))'
+          logql_topk_qt: 'topk(3, max by (fp, tbl) (max_over_time({job="mysql-slowlog"} | json | unwrap qt [5m])))'
+        labels:
+          severity: critical
+          hmall_alert: slowsql
+        isPaused: false
+        notification_settings:
+          receiver: hmall-slowsql-dingtalk
+
+      - uid: hmall_slowsql_warn
+        title: Slow SQL Warning（条数提醒）
+        condition: E
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: instant
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              editorMode: code
+              expr: sum(count_over_time({job="mysql-slowlog"} | json [5m] offset 5m))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: instant
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: $A - $B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
+          - refId: D
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: ($A > 20) && ($A <= 100) && ($C <= 50)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: D
+              type: math
+          - refId: E
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - D
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: D
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: E
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: '[Warning] 慢SQL：5m条数>20，且未达Critical(A≤100且Δ≤50)'
+          description: |
+            触发含义：A=近5m条数，B=前5m条数，C=A−B。条件：A>20 且 A≤100 且 C≤50（避免与 Critical 重复轰炸）。
+            持续 1m 后通知。请在 Explore 用 logql_* 确认是否为偶发或可优化 SQL。
+          logql_lines: '{job="mysql-slowlog"} | json'
+          logql_topk: 'topk(3, sum by (fp, tbl) (count_over_time({job="mysql-slowlog"} | json [5m])))'
+          logql_topk_qt: 'topk(3, max by (fp, tbl) (max_over_time({job="mysql-slowlog"} | json | unwrap qt [5m])))'
+        labels:
+          severity: warning
+          hmall_alert: slowsql
+        isPaused: false
+        notification_settings:
+          receiver: hmall-slowsql-dingtalk

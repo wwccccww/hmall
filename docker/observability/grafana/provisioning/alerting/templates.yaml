@@ -1,0 +1,53 @@
+# 钉钉 Markdown 正文（通知模板）。告警规则里可写 annotations，下面用 .Annotations.* 引用。
+# 说明：Grafana 通知模板无法直接执行 Loki 子查询，Top 指纹/表名/脱敏 SQL 请在 Explore 用下方 LogQL 查看。
+apiVersion: 1
+templates:
+  - orgId: 1
+    name: hmall-slowsql-dingtalk-templates
+    template: |
+      {{ define "hmall_slowsql_title" }}
+      [{{ .Status | toUpper }}] 慢 SQL（MySQL → Loki）
+      {{ end }}
+
+      {{ define "hmall_slowsql_body" }}
+      ### 慢 SQL 告警通知
+
+      - **Grafana**: {{ .ExternalURL }}
+      - **联系点**: {{ .Receiver }}
+
+      {{ range .Alerts.Firing }}
+      ---
+      #### {{ .Labels.alertname }}
+      - **级别**: `{{ .Labels.severity }}`
+      - **状态**: `{{ .Status }}`
+      - **开始**: {{ .StartsAt }}
+      {{- if .EndsAt }}
+      - **结束**: {{ .EndsAt }}
+      {{- end }}
+      - **表达式取值**: {{ .ValueString }}
+      {{- if .Annotations.summary }}
+      - **摘要 (summary)**: {{ .Annotations.summary }}
+      {{- end }}
+      {{- if .Annotations.description }}
+      - **说明 (description)**:
+      {{ .Annotations.description }}
+      {{- end }}
+      {{- if .Annotations.logql_lines }}
+      - **原始行（最近窗口）**: `{{ .Annotations.logql_lines }}`
+      {{- end }}
+      {{- if .Annotations.logql_topk }}
+      - **Top3 按次数（指纹/表）**: `{{ .Annotations.logql_topk }}`
+      {{- end }}
+      {{- if .Annotations.logql_topk_qt }}
+      - **Top3 按最大 qt（需 qt 为数值；否则改用 logql_topk）**: `{{ .Annotations.logql_topk_qt }}`
+      {{- end }}
+
+      {{ end }}
+
+      {{ if .Alerts.Resolved }}
+      ### 已恢复
+      {{ range .Alerts.Resolved }}
+      - {{ .Labels.alertname }}（{{ .Labels.severity }}）
+      {{ end }}
+      {{ end }}
+      {{ end }}

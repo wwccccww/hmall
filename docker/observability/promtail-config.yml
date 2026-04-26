@@ -34,7 +34,8 @@ scrape_configs:
           log_type: slow
           __path__: /var/log/mysql/slow.log
 
-    # slow log 为多行：先合并为单条事件，再提取耗时与 SQL，Grafana 里更好查/告警
+    # slow log 为多行：合并后解析；输出单行 JSON（fp/tbl/qt/q）供 Loki | json 与钉钉 relay 聚合 TopN
+    # 注意：勿把 query_time/sql 原文做成 Loki label（高基数）；指纹 fp 仅来自脱敏后的 sql_norm
     pipeline_stages:
       - multiline:
           firstline: '^# Time:'
@@ -43,10 +44,23 @@ scrape_configs:
           # 兼容 MySQL slow log 常见格式（Query_time 行 + SET timestamp 行 + SQL）
           # 注意：Promtail 使用 RE2，不支持 \Z 等 PCRE 语法；multiline 已保证每条事件独立，因此直接匹配到结尾即可
           expression: '(?s)^# Time:.*?\n# User@Host:.*?\n# Query_time: (?P<query_time>[0-9.]+)\s+Lock_time: (?P<lock_time>[0-9.]+)\s+Rows_sent: (?P<rows_sent>\d+)\s+Rows_examined: (?P<rows_examined>\d+).*?\nSET timestamp=\d+;\n(?P<sql>.*)$'
-      - labels:
-          query_time:
-      - output:
+      - regex:
+          expression: '(?i)(?:from|join|into|update)\s+`?(?P<tbl>[a-zA-Z0-9_.]+)`?'
           source: sql
+      - template:
+          source: sql_norm
+          template: '{{ regexReplaceAll `''[^'']*''` (regexReplaceAll `\b\d+\b` .sql "?") (print "'" "?" "'") }}'
+      - template:
+          source: fp
+          template: '{{ sha256sum .sql_norm | trunc 12 }}'
+      - template:
+          source: q
+          template: '{{ .sql_norm | trunc 180 }}'
+      - template:
+          source: logline
+          template: '{"fp":"{{ .fp }}","tbl":{{ (.tbl | default "") | toJson }},"qt":{{ .query_time }},"q":{{ .q | toJson }}}'
+      - output:
+          source: logline
 
   # 方案A：采集「Windows 本机运行的微服务」写到文件的日志（需先将 Windows 目录通过 SMB 挂载到虚拟机 /mnt/hmall，并在 compose 中映射为 /host-hmall）
   # - job_name: windows-host-logs

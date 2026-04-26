@@ -71,6 +71,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: "http://192.168.116.130:3000/"
+      # 钉钉机器人 access_token（供 provisioning/alerting/contact_points.yaml 中 $DINGTALK_ACCESS_TOKEN 插值）
+      DINGTALK_ACCESS_TOKEN: ${DINGTALK_ACCESS_TOKEN:-}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro

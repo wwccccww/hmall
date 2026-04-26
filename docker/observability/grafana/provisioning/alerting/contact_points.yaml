@@ -1,0 +1,15 @@
+# 钉钉机器人：在 compose / 运行环境中提供 DINGTALK_ACCESS_TOKEN（及可选 DINGTALK_SECRET 时自行处理加签 URL）。
+# 若 10.2.x 对 msgType=markdown 报错，可删掉 msgType 行，在 UI 中改为 Markdown。
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: hmall-slowsql-dingtalk
+    receivers:
+      - uid: hmall_ding_cp_slowsql
+        type: dingding
+        disableResolveMessage: false
+        settings:
+          url: https://oapi.dingtalk.com/robot/send?access_token=$DINGTALK_ACCESS_TOKEN
+          msgType: markdown
+          title: '{{ template "hmall_slowsql_title" . }}'
+          message: '{{ template "hmall_slowsql_body" . }}'
