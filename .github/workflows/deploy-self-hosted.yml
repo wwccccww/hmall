@@ -41,19 +41,62 @@ jobs:
       
       - name: 执行本地部署
         run: |
-          set -e
+          set -euo pipefail
+
+          if [[ -z "${{ secrets.ACR_REGISTRY }}" || -z "${{ secrets.ACR_NAMESPACE }}" ]]; then
+            echo "Missing secrets: ACR_REGISTRY / ACR_NAMESPACE" >&2
+            exit 1
+          fi
+
           # 进入项目目录（该目录需要存在 docker-compose.yml）
           cd /root/hmall
 
-          # 登录阿里云 ACR 并拉取部署
-          docker login "${{ secrets.ACR_REGISTRY }}" -u "${{ secrets.ACR_USERNAME }}" -p "${{ secrets.ACR_PASSWORD }}"
+          # 把 ACR 变量落到 .env：docker compose 默认会读取项目目录下的 .env 来展开 ${ACR_REGISTRY} 等变量
+          # 否则会出现 pull 大量 Skipped / up 报 No such image 这类“镜像名展开失败”的症状
+          env_file="/root/hmall/.env"
+          touch "${env_file}"
+
+          upsert_env() {
+            local key="$1"
+            local value="$2"
+            local tmp="${env_file}.tmp.$$"
+            local found="0"
+
+            if [[ -s "${env_file}" ]]; then
+              while IFS= read -r line || [[ -n "${line}" ]]; do
+                if [[ "${line}" =~ ^[[:space:]]*# ]]; then
+                  printf '%s\n' "${line}" >> "${tmp}"
+                  continue
+                fi
+                if [[ "${line}" =~ ^[[:space:]]*${key}[[:space:]]*= ]]; then
+                  printf '%s=%s\n' "${key}" "${value}" >> "${tmp}"
+                  found="1"
+                else
+                  printf '%s\n' "${line}" >> "${tmp}"
+                fi
+              done < "${env_file}"
+            fi
+
+            if [[ "${found}" == "0" ]]; then
+              printf '\n%s=%s\n' "${key}" "${value}" >> "${tmp}"
+            fi
+
+            mv "${tmp}" "${env_file}"
+          }
+
+          upsert_env "ACR_REGISTRY" "${{ secrets.ACR_REGISTRY }}"
+          upsert_env "ACR_NAMESPACE" "${{ secrets.ACR_NAMESPACE }}"
+          upsert_env "TAG" "${{ steps.tag.outputs.value }}"
+
+          # 登录阿里云 ACR（避免把密码直接拼到命令行参数里）
+          printf '%s\n' "${{ secrets.ACR_PASSWORD }}" | docker login "${{ secrets.ACR_REGISTRY }}" -u "${{ secrets.ACR_USERNAME }}" --password-stdin
 
           export ACR_REGISTRY="${{ secrets.ACR_REGISTRY }}"
           export ACR_NAMESPACE="${{ secrets.ACR_NAMESPACE }}"
           export TAG="${{ steps.tag.outputs.value }}"
 
           docker compose pull
-          docker compose up -d --no-build || {
+          docker compose up -d --no-build --remove-orphans || {
             echo "=== docker compose ps -a ==="
             docker compose ps -a || true
             echo "=== hmall-nacos logs (tail 200) ==="
