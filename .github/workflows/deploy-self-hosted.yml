@@ -163,6 +163,25 @@ jobs:
           export ACR_NAMESPACE="${{ secrets.ACR_NAMESPACE }}"
           export TAG="${{ steps.tag.outputs.value }}"
 
+          # 如果 ACR 上不存在本次要部署的 TAG（常见于 Publish 未 retag 的历史问题），回退到 latest 以保证 CD 可继续
+          if [[ "${TAG}" != "latest" ]]; then
+            services=(hm-gateway item-service cart-service user-service trade-service pay-service promotion-service ai-assistant-service)
+            missing="0"
+            for s in "${services[@]}"; do
+              img="${ACR_REGISTRY}/${ACR_NAMESPACE}/hmall-${s}:${TAG}"
+              if ! docker buildx imagetools inspect "${img}" >/dev/null 2>&1; then
+                missing="1"
+                echo "WARN: missing image manifest: ${img}" >&2
+              fi
+            done
+            if [[ "${missing}" == "1" ]]; then
+              echo "WARN: TAG=${TAG} 在 ACR 上不存在或不完整；将回退部署 TAG=latest（建议重新触发 Publish 以补齐 commit tag）。" >&2
+              TAG="latest"
+              upsert_env "TAG" "${TAG}"
+              export TAG
+            fi
+          fi
+
           echo "=== docker compose resolved images (business services) ==="
           cfg="$(docker compose config)"
           printf '%s\n' "${cfg}" | awk '
