@@ -13,6 +13,9 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     # 核心修改：指定在你刚才配置的 Docker Runner 上运行
@@ -54,12 +57,40 @@ jobs:
           # 同步 compose 文件：否则虚拟机可能还停留在旧的 GHCR 配置，表现为 pull Skipped + ps 里仍是 ghcr.io/...
           if [[ -d .git ]]; then
             git remote -v || true
-            git fetch --all --prune
-            default_branch="$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p' || true)"
-            if [[ -n "${default_branch}" ]]; then
-              git checkout "${default_branch}"
+
+            # 说明：很多机器 clone 用的是 git@github.com:...，但 runner 未配置 known_hosts 时会报：
+            # Host key verification failed
+            # 这里强制走 HTTPS，并用 GITHUB_TOKEN（Actions 自动注入）拉取代码。
+            if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+              echo "ERROR: 缺少 GITHUB_TOKEN（请确认 workflow permissions 未禁用 token）" >&2
+              exit 1
             fi
-            git pull --ff-only
+
+            git remote set-url origin "https://github.com/${{ github.repository }}.git"
+
+            default_branch=""
+            if git symbolic-ref -q refs/remotes/origin/HEAD >/dev/null 2>&1; then
+              default_branch="$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
+            fi
+            if [[ -z "${default_branch}" ]]; then
+              if git show-ref --verify --quiet refs/heads/main; then
+                default_branch="main"
+              elif git show-ref --verify --quiet refs/heads/master; then
+                default_branch="master"
+              else
+                echo "ERROR: 无法推断默认分支（缺少 origin/HEAD，且本地无 main/master）" >&2
+                exit 1
+              fi
+            fi
+
+            git -c http.version=HTTP/1.1 \
+              -c "http.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
+              fetch --prune origin
+
+            git checkout "${default_branch}"
+            git -c http.version=HTTP/1.1 \
+              -c "http.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
+              pull --ff-only origin "${default_branch}"
           else
             echo "WARN: /root/hmall 不是 git 仓库，无法自动 git pull；请手动同步最新 docker-compose.yml" >&2
           fi
