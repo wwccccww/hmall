@@ -51,6 +51,19 @@ jobs:
           # 进入项目目录（该目录需要存在 docker-compose.yml）
           cd /root/hmall
 
+          # 同步 compose 文件：否则虚拟机可能还停留在旧的 GHCR 配置，表现为 pull Skipped + ps 里仍是 ghcr.io/...
+          if [[ -d .git ]]; then
+            git remote -v || true
+            git fetch --all --prune
+            default_branch="$(git remote show origin 2>/dev/null | sed -n '/HEAD branch/s/.*: //p' || true)"
+            if [[ -n "${default_branch}" ]]; then
+              git checkout "${default_branch}"
+            fi
+            git pull --ff-only
+          else
+            echo "WARN: /root/hmall 不是 git 仓库，无法自动 git pull；请手动同步最新 docker-compose.yml" >&2
+          fi
+
           # 把 ACR 变量落到 .env：docker compose 默认会读取项目目录下的 .env 来展开 ${ACR_REGISTRY} 等变量
           # 否则会出现 pull 大量 Skipped / up 报 No such image 这类“镜像名展开失败”的症状
           env_file="/root/hmall/.env"
@@ -68,7 +81,8 @@ jobs:
                   printf '%s\n' "${line}" >> "${tmp}"
                   continue
                 fi
-                if [[ "${line}" =~ ^[[:space:]]*${key}[[:space:]]*= ]]; then
+                # 注意：不要用 [[ =~ .*${key}.* ]]（key 含 '-' 时可能被误解析为正则范围）
+                if [[ "${line}" == "${key}"=* || "${line}" == *"${key} ="* ]]; then
                   printf '%s=%s\n' "${key}" "${value}" >> "${tmp}"
                   found="1"
                 else
@@ -94,6 +108,35 @@ jobs:
           export ACR_REGISTRY="${{ secrets.ACR_REGISTRY }}"
           export ACR_NAMESPACE="${{ secrets.ACR_NAMESPACE }}"
           export TAG="${{ steps.tag.outputs.value }}"
+
+          echo "=== docker compose resolved images (business services) ==="
+          cfg="$(docker compose config)"
+          printf '%s\n' "${cfg}" | awk '
+            $0 ~ /^[[:space:]]*(hm-gateway|item-service|cart-service|user-service|trade-service|pay-service|promotion-service|promotion-service-2|ai-assistant-service):[[:space:]]*$/ {
+              svc=$0
+              sub(/^[[:space:]]+/, "", svc)
+              sub(/:[[:space:]]*$/, "", svc)
+              next
+            }
+            $0 ~ /^[[:space:]]*image:[[:space:]]+/ {
+              if (svc != "") {
+                img=$0
+                sub(/^[[:space:]]*image:[[:space:]]+/, "", img)
+                print svc ": image: " img
+                svc=""
+              }
+            }
+          '
+
+          if printf '%s\n' "${cfg}" | grep -E '^[[:space:]]*image:.*ghcr\\.io' >/dev/null 2>&1; then
+            echo "ERROR: docker-compose 仍包含 ghcr.io 镜像引用；请确认 /root/hmall 已同步到包含 ACR image: 的最新提交。" >&2
+            exit 1
+          fi
+
+          if printf '%s\n' "${cfg}" | grep -E '^[[:space:]]*image:.*\\$\\{ACR_(REGISTRY|NAMESPACE)\\}' >/dev/null 2>&1; then
+            echo "ERROR: compose 配置里仍有未展开的 \${ACR_REGISTRY}/\${ACR_NAMESPACE}；请检查 /root/hmall/.env 是否写入成功。" >&2
+            exit 1
+          fi
 
           docker compose pull
           docker compose up -d --no-build --remove-orphans || {
